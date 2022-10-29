@@ -1,6 +1,7 @@
 import fcntl
 import socket
 import select
+import netifaces
 
 
 def recievedArp():
