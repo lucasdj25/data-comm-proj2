@@ -6,6 +6,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/select.h>
+#include <netpacket/packet.h> 
+#include <net/ethernet.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+
 
 using namespace std;
 
@@ -16,45 +23,52 @@ using namespace std;
 */
 
 int main(int argc, char **argv){
-  int sockfd = socket(AF_INET,SOCK_DGRAM,0);
+  int packet_sockets[16];
+  struct ifaddr *ifaddr, *tmp;
 
-  struct sockaddr_in serveraddr,clientaddr;
-  serveraddr.sin_family=AF_INET;
-  serveraddr.sin_port=htons(9876);
-  serveraddr.sin_addr.s_addr=INADDR_ANY;
-
-  bind(sockfd,(struct sockaddr*)&serveraddr,
-       sizeof(serveraddr));
-
-  fd_set myfds;
-
-  // clears the set
-  FD_ZERO(&myfds);
-
-  // add sockfd file descriptor to myfds
-  FD_SET(sockfd,&myfds);
-
-  // add STDIN_FILENO descriptor to myfds
-  FD_SET(STDIN_FILENO,&myfds);
-  
-  while(1){
-    fd_set tmp=myfds;
-    int nn=select(FD_SETSIZE,&tmp,NULL,NULL,NULL);
-    if(FD_ISSET(sockfd,&tmp)){
-	  cout << "Got something on the socket" << endl;
-      socklen_t len = sizeof(clientaddr);
-      char line[5000];
-      int n = recvfrom(sockfd,line,5000,0,
-		       (struct sockaddr*)&clientaddr,&len);
-	  cout << line << endl;
-    }
-    if(FD_ISSET(STDIN_FILENO,&tmp)){
-	  cout << "The user typed something, I better do something with it" << endl;
-      char buf[5000];
-      fgets(buf,5000,stdin);
-	  cout << "You typed" << buf << endl;
-    }
-    
-
+  if(getifaddrs(&ifaddr)==-1){
+    perror("getifaddrs");
+    return 1;
   }
+
+  int i = 0;
+
+  // Puts all packet sockets into array
+  for(tmp = ifaddr; tmp!=NULL; tmp=tmp->ifa_next){
+    if(tmp->ifa_addr->sa_family==AF_PACKET){
+	  cout << "Interface: " << tmp->ifa_name << endl;
+
+      if(!strncmp(&(tmp->ifa_name[3]),"eth",3)){
+        cout << "Creating Socket on interface " << tmp->ifa_name << endl;
+
+        packet_socket[i] = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+        if(packet_socket[i]<0){
+          perror("socket");
+          return 2;
+        }
+
+        if(bind(packet_socket[i],tmp->ifa_addr,sizeof(struct sockaddr_ll))==-1){
+          perror("bind");
+        }
+
+        i++;
+      }
+    }
+  }
+
+  // Creates a fd_set with all the sockets
+  fd_set fds;
+
+  FD_ZERO(&fds);
+
+  for(int j=0;j<i;j++){
+    FD_SET(packet_sockets[j], &fds);
+  }
+
+  while(1){
+    fd_set tmp = fds;
+    int nn=select(FD_SETSIZE, &tmp, NULL, NULL, NULL);
+  }
+
+
 }
