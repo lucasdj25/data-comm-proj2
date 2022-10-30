@@ -1,0 +1,9 @@
+
+
+when router gets ARP request:
+    send ARP response on same socket back to sender
+        (mac addr in reply should be same interface as IP addr indicated in request)
+        (ARP packet consists of ether header and ARP header)
+
+when receive ICMP echo request:
+    send reply with same ID, seq num, and data as the response
