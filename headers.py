@@ -1,6 +1,14 @@
 import struct
 import netifaces
+"""
+ARP request - response
+Rq       Rs
+src ip   dest ip
+src mac  dest mac
+dest ip  src ip
+dest mac src mac
 
+"""
 
 class EtherHeader:
     def __init__(self, src_mac, dest_mac, data):
@@ -23,9 +31,13 @@ class IPHeader:
 class ICMPHeader:
     pass
 
+
+class ARPHeader:
+    pass
+
 class ARP:
     def __init__(self, ether_header, ARP_header):
         self.ether_header : EtherHeader = ether_header
-        self.ARP_header = ARP_header
+        self.ARP_header : ARPHeader = ARP_header
 
 

@@ -6,6 +6,12 @@
 #include <unistd.h>
 #include <sys/select.h>
 
+/* struct fd_set {
+  int fd_count;
+  socket fd_array[];
+}
+*/
+
 int main(int argc, char **argv){
   int sockfd = socket(AF_INET,SOCK_DGRAM,0);
 
@@ -18,8 +24,14 @@ int main(int argc, char **argv){
        sizeof(serveraddr));
 
   fd_set myfds;
+
+  // clears the set
   FD_ZERO(&myfds);
+
+  // add sockfd file descriptor to myfds
   FD_SET(sockfd,&myfds);
+
+  // add STDIN_FILENO descriptor to myfds
   FD_SET(STDIN_FILENO,&myfds);
   
   while(1){
