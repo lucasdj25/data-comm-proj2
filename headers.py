@@ -7,7 +7,6 @@ src ip   dest ip
 src mac  dest mac
 dest ip  src ip
 dest mac src mac
-
 """
 
 class EtherHeader:

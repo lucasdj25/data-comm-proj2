@@ -31,7 +31,7 @@ int main(int argc, char **argv){
   // add sockfd file descriptor to myfds
   FD_SET(sockfd,&myfds);
 
-  // add STDIN_FILENO descriptor to myfds
+  // add STDIN_FILENO file descriptor to myfds
   FD_SET(STDIN_FILENO,&myfds);
   
   while(1){
