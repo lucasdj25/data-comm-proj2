@@ -5,7 +5,7 @@ R1_TABLE = {"10.0.0.0/16" : "r1-eth0",
             "10.3.0.0/16" : "r1-eth0",
             "10.0.0.2" : "r1-eth0"}
 
-R1_TABLE = {"10.0.0.0/16" : "r2-eth0",
+R2_TABLE = {"10.0.0.0/16" : "r2-eth0",
             "10.3.0.0/24" : "r2-eth1",
             "10.3.1.0/24" : "r2-eth2",
             "10.3.4.0/24" : "r2-eth3",
@@ -39,5 +39,12 @@ sum = flipped_bits(sum)
 # returns the address from the given routing table
 # TODO: modify params 
 def read(table: str, other_params: str):
+    pass
+
+
+def ARP_recieved():
+    pass
+
+def ICMP_received():
     pass
     
