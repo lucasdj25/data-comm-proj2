@@ -45,7 +45,7 @@ int main(int argc, char **argv){
 				cout << "Creating Socket on interface " << tmp->ifa_name << endl;
 
 				packet_sockets[i] = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-				if(packet_socket[i]<0){
+				if(packet_sockets[i]<0){
 					perror("socket");
 					return 2;
 				}
