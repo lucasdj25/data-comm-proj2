@@ -5,7 +5,7 @@
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <stdio.h>
-#include <string>
+#include <cstring>
 #include <unistd.h>
 #include <sys/select.h>
 #include <netpacket/packet.h> 
@@ -44,13 +44,13 @@ int main(int argc, char **argv){
 			if(!strncmp(&(tmp->ifa_name[3]),"eth",3)){
 				cout << "Creating Socket on interface " << tmp->ifa_name << endl;
 
-				packet_socket[i] = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+				packet_sockets[i] = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 				if(packet_socket[i]<0){
 					perror("socket");
 					return 2;
 				}
 
-				if(bind(packet_socket[i],tmp->ifa_addr,sizeof(struct sockaddr_ll))==-1){
+				if(bind(packet_sockets[i],tmp->ifa_addr,sizeof(struct sockaddr_ll))==-1){
 					perror("bind");
 				}
 
@@ -68,36 +68,45 @@ int main(int argc, char **argv){
 		FD_SET(packet_sockets[j], &fds);
 	}
 
+  // Listens for packets on all sockets
 	while(1){
 		fd_set tmp = fds;
 		int nn=select(FD_SETSIZE, &tmp, NULL, NULL, NULL);
-		if(FD_ISSET(sockfd,&tmp)){
-			cout << "Got something on the socket" << endl;
-			socklen_t len = sizeof(clientaddr);
-			char line[5000];
-			int n = recvfrom(sockfd,line,5000,0,
-					 (struct sockaddr*)&clientaddr,&len);
+    for(int j=0; j<i;j++){
+      if(FD_ISSET(packet_sockets[j],&tmp)){
+        cout << "Got something on the socket" << endl;
 
-			struct ether_header eh;
-			memcpy(&eh, line, 14);
+        char line[5000];
+        struct sockaddr_ll recvaddr;
+        unsigned int recvaddrlen=sizeof(struct sockaddr_ll);
+  
+        int n = recvfrom(packet_sockets[j], line, 5000,0,
+          (struct sockaddr*)&recvaddr, &recvaddrlen);
 
-			// ip type is 0x0800, for pings
-			if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
-				memcpy(&eh,line,14);
-				struct iphdr iph;
-				struct ICMPHeader icmph;
-				memcpy(&iph,line+14,20);
+        if(recvaddr.sll_pkttype==PACKET_OUTGOING)
+          continue;
 
-				// ICMP echo reply consists of the ethernet header, ip header, and icmp header
-				createIcmpReply(eh, iph, icmph);
-			}
-			// arp type is 0x0806
-			if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
-				struct arphdr arph;
-				memcpy(&arph, line+14, 20);
-				// ARP reply consists of the ethernet header and ARP header
-				createArpReply(eh, arph);
-			}
-		}
+        struct ether_header eh;
+        memcpy(&eh, line, 14);
+
+        // ip type is 0x0800, for pings
+        if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
+          memcpy(&eh,line,14);
+          struct iphdr iph;
+          struct ICMPHeader icmph;
+          memcpy(&iph,line+14,20);
+
+          // ICMP echo reply consists of the ethernet header, ip header, and icmp header
+          createIcmpReply(eh, iph, icmph);
+        }
+        // arp type is 0x0806
+        if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
+          struct arphdr arph;
+          memcpy(&arph, line+14, 20);
+          // ARP reply consists of the ethernet header and ARP header
+          createArpReply(eh, arph);
+        }
+		  }
+    }
 	}
 }
