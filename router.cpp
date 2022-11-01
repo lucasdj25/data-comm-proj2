@@ -157,13 +157,30 @@ int main(int argc, char **argv){
 
         // ip type is 0x0800, for pings
         if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
-          memcpy(&eh,line,14);
-          struct iphdr iph;
-//          struct ICMPHeader icmph;
-          memcpy(&iph,line+14,20);
 
-          // ICMP echo reply consists of the ethernet header, ip header, and icmp header
-//          createICMPReply(eh, iph, icmph);
+		struct ether_arp arph;
+                  struct in_addr ipaddr;
+          memcpy(&arph, line+14, 28);
+          memcpy(&ipaddr.s_addr, arph.arp_tpa, 4);
+          cout << "dest: " << inet_ntoa(ipaddr) << endl;
+          string routerIP = inet_ntoa(ipaddr);
+          string rIP = "10.1.0.1";
+          if(rIP.compare(routerIP) == 0) {
+                cout << "router ip is 10.1.0.1" << endl;
+                char interf[] = {'r','1','-','e','t','h','1','\0'};
+                char interf2[] = {'r','1','-','e','t','h','2','\0'};
+                for(const auto& n : macMap) {
+                        unsigned char macAddr[6];
+                        memcpy(&macAddr, n.second, 6);
+                        if(strcmp(interf,n.first) == 0) {
+                          createArpReply(eh, arph, packet_sockets[j], line, macAddr, recvaddr);
+                        }
+                        else if(strcmp(interf2,n.first) == 0) {
+                          createArpReply(eh, arph, packet_sockets[j], line, macAddr, recvaddr);
+                        }
+
+                }
+                cout << "interface is : " << interf << endl;
         }
         // arp type is 0x0806
         if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
