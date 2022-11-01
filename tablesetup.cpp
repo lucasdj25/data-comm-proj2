@@ -2,10 +2,14 @@
 #include <string>
 #include <vector>
 #include <iostream>
-
+#include <cstdio>
+/*
+All code in this file will eventually end up in router.cpp.
+This file only exists to test out functions and not clutter the main program for now
+*/
 using namespace std;
 
-typedef map<string, std::vector<string>> table;
+typedef map<string, vector<string> > table;
 
 table t1 = {{"10.0.0.0/16", {"", "r1-eth0"}}, 
             {"10.1.0.0/24", {"", "r1-eth1"}},
@@ -18,40 +22,53 @@ table t2 = {{"10.0.0.0/16", {"", "r2-eth0"}},
             {"10.3.4.0/24", {"", "r2-eth3"}}, 
             {"10.1.0.0/16", {"10.0.0.1", "r2-eth0"}}};
 
-// params: address to search with and number of the router (1 or 2)
-// returns the hop, if it has one, else the interface
-// TODO: add functionality to return interface if there's no hop
-vector<string> get_interface_or_hop(string address, int router){
-    cout << "Address input: " << address << endl;
-    if (router == 1){
-        try{ return t1[address]; }
-        catch(exception e){ cout << e.what() << endl; }
+// returns the next hop for an address
+string get_next_hop(int router, string address){
+    string hop = "";
+    try {
+        hop = router == 1 ? t1[address][0] : t2[address][0];
     }
-
-    try { return t2[address]; }
-    catch(exception e){ cout << e.what() << endl; }
-
-    return {"NONE"};
+    catch(exception e){
+    }
+    return hop;
 }
+
+// returns the interface for an address
+string get_interface(int router, string address){
+    return router == 1 ? t1[address][1] : t2[address][1];
+}
+
 // matches a given address with it's table key
-string match_address(string address, int router){
+/* string match_address(string address, int router){
     
     // for prefix 10.0.0.0
     // if the last num = 24: address can be between 10.0.0.0 and 10.0.0.255
     // if the last num = 16: address can be between 10.0.0.0 and 10.0.255.255
 
-    // the number of 
+    // the number after the /
     int num_addrs = stoi(address.substr(address.length() - 2));
 
     // set table based on the router number
     table table = router == 1 ? t1 : t2;
+    int num1, num2, num3, num4, num5;
+    if (sscanf(address, "%d.%d.%d.%d/%d", &num1, &num2, &num3, &num4, &num5) == 5){
+        int x = 1;
+    }
 
     
 
-    return NULL;
-}
+    return "";
+} */
 
 int main(void){
+
+    string test_list[5] = {"10.0.0.0/16", "10.1.1.0/24", "apple"};
+    int length = sizeof(test_list) / sizeof(string);
+    for (int i = 0; i < 3; i++){
+        cout << "interface for " << test_list[i] << ": " << get_interface(1, test_list[i]) << endl;
+    }
+
+
     return 0;
 }
 
