@@ -22,20 +22,34 @@
 
 using namespace std;
 
-/* struct fd_set {
-	int fd_count;
-	socket fd_array[];
-}
-*/
 
-void createArpReply(ether_header *eh, arphdr *arph, int sockfd){
+void createArpReply(ether_header *eh, arphdr *arph, int sockfd, char line[], char sourceMac[]){
+
+  char newLine[5000];
 
   struct ether_header eh2;
   eh2.ether_dhost = eh->ether_shost;
   eh2.ether_shost = eh->ether_dhost;
   eh2.ether_type = eh->ether_type;
 
-  
+  memcpy(&newLine, eh2, sizeof(ether_header));
+
+  struct arphdr arph2;
+  arhp2.ar_hrd = arph.ar_hrd;
+  arph2.ar_pro = arph.ar_pro;
+  arph2.ar_hln = arph.ar_hln;
+  arph2.ar_pln = arph.ar_pln;
+  arph2.ar_op = 2;
+
+  arph2.__ar_tha[ETH_ALEN] = arph.__ar_sha[ETH_ALEN];
+  arph2.__ar_tip[4] = arph.__ar_sip[4];
+  arph2.__ar_sip[4] = arph.__ar_tip[4];
+  arph2.__ar_sha[ETH_ALEN] = sourceMac;
+
+  memcpy(&newLine+14, arph2, sizeof(arphdr));
+
+
+  int n = sendto(sockfd, );
 }
 
 void createICMPReply(ether_header *eh, iphdr *iphdrph, int sockfd){
@@ -57,6 +71,8 @@ int main(int argc, char **argv){
 	for(tmp = ifaddr; tmp!=NULL; tmp=tmp->ifa_next){
 		if(tmp->ifa_addr->sa_family==AF_PACKET){
 		cout << "Interface: " << tmp->ifa_name << endl;
+
+    cout << "Mac Address: " << tmp->ifa_addr << endl;
 
 			if(!strncmp(&(tmp->ifa_name[3]),"eth",3)){
 				cout << "Creating Socket on interface " << tmp->ifa_name << endl;
@@ -118,12 +134,14 @@ int main(int argc, char **argv){
         }
         // arp type is 0x0806
         if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
+
           struct arphdr arph;
-          memcpy(&arph, line+14, 20);
+          memcpy(&arph, line+14, 28);
           // ARP reply consists of the ethernet header and ARP header
-          createArpReply(eh, arph);
+          createArpReply(eh, arph, packet_sockets[j], line);
         }
 		  }
     }
 	}
+  freeifaddrs(ifaddr);
 }
