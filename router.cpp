@@ -1,4 +1,6 @@
 #include <iostream>
+#include <map>
+#include <iomanip>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
@@ -26,6 +28,8 @@ using namespace std;
 void createArpReply(ether_header *eh, arphdr *arph, int sockfd, char line[], char sourceMac[]){
 
   char newLine[5000];
+  memcpy(&newLine, eh->ether_shost, 6);
+  memcpy(&newLine+6, eh->ether_dhost, 6);
 
   struct ether_header eh2;
   eh2.ether_dhost = eh->ether_shost;
@@ -67,11 +71,13 @@ int main(int argc, char **argv){
 
 	int i = 0;
 
+	// <interface, mac address>
+	map<char*,unsigned char*> macMap;
+
 	// Puts all packet sockets into array
 	for(tmp = ifaddr; tmp!=NULL; tmp=tmp->ifa_next){
 		if(tmp->ifa_addr->sa_family==AF_PACKET){
 		cout << "Interface: " << tmp->ifa_name << endl;
-
 
 		cout << "Mac Address: "; 
 		struct sockaddr_ll *s = (struct sockaddr_ll*)tmp->ifa_addr;
@@ -79,6 +85,7 @@ int main(int argc, char **argv){
 			printf("%02x%c",(s->sll_addr[k]));
 		}
 		cout << endl << endl;
+		macMap.insert(make_pair(tmp->ifa_name, s->sll_addr));
 
 			if(!strncmp(&(tmp->ifa_name[3]),"eth",3)){
 				cout << "Creating Socket on interface " << tmp->ifa_name << endl;
@@ -97,6 +104,19 @@ int main(int argc, char **argv){
 			}
 		}
 	}
+
+	// Prints mac address with their corresponding interfaces
+	cout << "Mac Address Map" << endl;
+	for(const auto& n : macMap) {
+		unsigned char macAddr[6];
+		memcpy(&macAddr, n.second, 6);
+		stringstream ss;
+		for(unsigned char c : macAddr)
+			ss << setw(2) << setprecision(2) << setfill('0') << hex << (unsigned)c << " ";
+		string sMac = ss.str();
+		cout << "Mac addr on interface " << n.first << " is: " << sMac << endl;
+	}
+
 
 	// Creates a fd_set with all the sockets
 	fd_set fds;
