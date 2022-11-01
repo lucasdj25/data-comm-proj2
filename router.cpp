@@ -12,48 +12,51 @@
 #include <sys/select.h>
 #include <netpacket/packet.h> 
 #include <net/ethernet.h>
+#include <netinet/ether.h>
 #include <net/if.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <ifaddrs.h>
+#include <net/if_arp.h>
 
-#include "header.hpp"
+//#include "header.hpp"
 
 
 
 using namespace std;
 
 
-void createArpReply(ether_header *eh, arphdr *arph, int sockfd, char line[], char sourceMac[], sockaddr_ll *recvaddr){
+void createArpReply(ether_header &eh, ether_arp &arph, int sockfd, char line[], char *sourceMac, sockaddr_ll &recvaddr){
 
   char newLine[5000];
-  memcpy(&newLine, eh->ether_shost, 6);
-  memcpy(&newLine+6, eh->ether_dhost, 6);
+  memcpy(&newLine, eh.ether_shost, 6);
+  memcpy(&newLine+6, eh.ether_dhost, 6);
 
   // Ethernet header
-  struct ether_header eh2;
+  struct ether_header *eh2;
 
-  struct ether_addr src_mac = ether_aton(sourceMac);
+  struct ether_addr *src_mac = ether_aton(sourceMac);
 
-  memcpy(&eh2.ether_shost, src_mac, ETH_ALEN);
-  memcpy(&eh2.ether_dhost, &eh->ether_shost, ETH_ALEN);
+  memcpy(&eh2->ether_shost, src_mac, ETH_ALEN);
+  memcpy(&eh2->ether_dhost, &eh.ether_shost, ETH_ALEN);
   eh2->ether_type = htons(ETHERTYPE_ARP);
 
   memcpy(&line, eh2, sizeof(ether_header));
 
   // Arp header
-  struct arphdr arph2;
+  struct ether_arp *arph2;
+
   arph2->arp_hrd = htons(ARPHRD_ETHER);
   arph2->arp_pro = htons(ETHERTYPE_IP);
   arph2->arp_hln = ETH_ALEN;
-  arph2->arp_pln = ARP_PROLEN;
+  arph2->arp_pln = 4;
   arph2->arp_op = htons(ARPOP_REPLY);
 
-  memcpy(&arph2.__ar_sha, src_mac, ETH_ALEN);
-  memcpy(&arph2.__ar_tha, &arp.__ar_sha, ETH_ALEN);
+  memcpy(&arph2->arp_sha, src_mac, ETH_ALEN);
+  memcpy(&arph2->arp_tha, &arph.arp_sha, ETH_ALEN);
 
-  memcpy(&arph2.__ar_sip, &arph.__ar_tip, 4);
-  memcpy(&arph2.__ar_tip, &arph.__ar_sip, 4);
+  memcpy(&arph2->arp_spa, &arph.arp_tpa, 4);
+  memcpy(&arph2->arp_tpa, &arph.arp_spa, 4);
 
   memcpy(&line+14, arph2, sizeof(arphdr));
 
@@ -156,16 +159,16 @@ int main(int argc, char **argv){
         if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
           memcpy(&eh,line,14);
           struct iphdr iph;
-          struct ICMPHeader icmph;
+//          struct ICMPHeader icmph;
           memcpy(&iph,line+14,20);
 
           // ICMP echo reply consists of the ethernet header, ip header, and icmp header
-          createIcmpReply(eh, iph, icmph);
+//          createICMPReply(eh, iph, icmph);
         }
         // arp type is 0x0806
         if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
 
-          struct arphdr arph;
+          struct ether_arp arph;
           memcpy(&arph, line+14, 28);
           // ARP reply consists of the ethernet header and ARP header
           createArpReply(eh, arph, packet_sockets[j], line, "temp", recvaddr);
