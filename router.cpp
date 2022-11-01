@@ -26,45 +26,62 @@
 using namespace std;
 
 
-void createArpReply(ether_header &eh, ether_arp &arph, int sockfd, char line[], char *sourceMac, sockaddr_ll &recvaddr){
+void createArpReply(ether_header &eh, ether_arp &arph, int sockfd, char *line, char *sourceMac, sockaddr_ll &recvaddr){
 
-  char newLine[5000];
-  memcpy(&newLine, eh.ether_shost, 6);
-  memcpy(&newLine+6, eh.ether_dhost, 6);
-
-  // Ethernet header
+  /* Ethernet header */
   struct ether_header *eh2;
 
   struct ether_addr *src_mac = ether_aton(sourceMac);
-
+ 
+  // Source Mac address
   memcpy(&eh2->ether_shost, src_mac, ETH_ALEN);
+  // Target Mac address
   memcpy(&eh2->ether_dhost, &eh.ether_shost, ETH_ALEN);
+  // Ethernet type
   eh2->ether_type = htons(ETHERTYPE_ARP);
 
+  // Puts header into packet
   memcpy(&line, eh2, sizeof(ether_header));
 
-  // Arp header
+  /* Arp header */
   struct ether_arp *arph2;
-
+	
+  // Fixed header
   arph2->arp_hrd = htons(ARPHRD_ETHER);
   arph2->arp_pro = htons(ETHERTYPE_IP);
   arph2->arp_hln = ETH_ALEN;
   arph2->arp_pln = 4;
   arph2->arp_op = htons(ARPOP_REPLY);
-
+	
+  // Source Mac address
   memcpy(&arph2->arp_sha, src_mac, ETH_ALEN);
+  // Target Mac address
   memcpy(&arph2->arp_tha, &arph.arp_sha, ETH_ALEN);
-
+  // Source IP address
   memcpy(&arph2->arp_spa, &arph.arp_tpa, 4);
+  // Target IP address
   memcpy(&arph2->arp_tpa, &arph.arp_spa, 4);
 
+  // Puts header into packet
   memcpy(&line+14, arph2, sizeof(arphdr));
-
+	
+  // Sends packet
   sendto(sockfd, line, strlen(line)+1,0, (struct sockaddr*)&recvaddr,sizeof(recvaddr));
 }
 
-void createICMPReply(ether_header *eh, iphdr *iphdrph, int sockfd){
+void createICMPReply(ether_header *eh, iphdr *ih, int sockfd, char *line){
+
+  // Ethernet header
+  struct ether_header *eh2;
+  memcpy(&eh2->ether_shost, &eh->ether_dhost, ETH_ALEN);
+  memcpy(&eh2->ether_dhost, &eh->ether_shost, ETH_ALEN);
+  eh->ether_type = htons(ETHERTYPE_IP);
   
+  memcpy(&line, eh2, sizeof(ether_header));
+  
+  // IP header
+  struct iphdr *ih2;
+ 	
 }
 
 int main(int argc, char **argv){
@@ -167,14 +184,14 @@ int main(int argc, char **argv){
         }
         // arp type is 0x0806
         if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
-
           struct ether_arp arph;
           memcpy(&arph, line+14, 28);
+          
           // ARP reply consists of the ethernet header and ARP header
-          createArpReply(eh, arph, packet_sockets[j], line, "temp", recvaddr);
+  //        createArpReply(eh, arph, packet_sockets[j], line, "temp", recvaddr);
         }
-		  }
+      }
     }
-	}
+  }
   freeifaddrs(ifaddr);
 }
