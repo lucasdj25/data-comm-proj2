@@ -26,22 +26,22 @@
 using namespace std;
 
 
-void createArpReply(ether_header &eh, ether_arp &arph, int sockfd, char *line, char *sourceMac, sockaddr_ll &recvaddr){
+void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *line, unsigned char *sourceMac, sockaddr_ll recvaddr){
 
   /* Ethernet header */
   struct ether_header *eh2;
 
-  struct ether_addr *src_mac = ether_aton(sourceMac);
+//  struct ether_addr *src_mac = ether_aton(sourceMac);
  
   // Source Mac address
-  memcpy(&eh2->ether_shost, src_mac, ETH_ALEN);
+  memcpy(&eh2->ether_shost, sourceMac, 6);
   // Target Mac address
-  memcpy(&eh2->ether_dhost, &eh.ether_shost, ETH_ALEN);
+  memcpy(&eh2->ether_dhost, &eh.ether_shost, 6);
   // Ethernet type
   eh2->ether_type = htons(ETHERTYPE_ARP);
 
   // Puts header into packet
-  memcpy(&line, eh2, sizeof(ether_header));
+  memcpy(&line, &eh2, sizeof(ether_header));
 
   /* Arp header */
   struct ether_arp *arph2;
@@ -54,19 +54,23 @@ void createArpReply(ether_header &eh, ether_arp &arph, int sockfd, char *line, c
   arph2->arp_op = htons(ARPOP_REPLY);
 	
   // Source Mac address
-  memcpy(&arph2->arp_sha, src_mac, ETH_ALEN);
+  memcpy(&arph2->arp_sha, sourceMac, 6);
   // Target Mac address
-  memcpy(&arph2->arp_tha, &arph.arp_sha, ETH_ALEN);
+  memcpy(&arph2->arp_tha, &arph.arp_sha, 6);
+  
   // Source IP address
   memcpy(&arph2->arp_spa, &arph.arp_tpa, 4);
   // Target IP address
   memcpy(&arph2->arp_tpa, &arph.arp_spa, 4);
 
   // Puts header into packet
-  memcpy(&line+14, arph2, sizeof(arphdr));
+  memcpy(&line[14], &arph2, sizeof(ether_arp));
 	
   // Sends packet
-  sendto(sockfd, line, strlen(line)+1,0, (struct sockaddr*)&recvaddr,sizeof(recvaddr));
+  cout << "Sending Arp Reply" << endl;
+  int n = sendto(sockfd, line, sizeof(line),0, (struct sockaddr*)&recvaddr,sizeof(recvaddr));
+  cout << n << endl;
+  cout << "Arp Reply Sent" << endl;
 }
 
 void createICMPReply(ether_header *eh, iphdr *ih, int sockfd, char *line){
@@ -174,11 +178,18 @@ int main(int argc, char **argv){
 
         // ip type is 0x0800, for pings
         if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
-
-		struct ether_arp arph;
-                  struct in_addr ipaddr;
+        
+        
+        }
+        // arp type is 0x0806
+        if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
+          cout << "Recieved an ARP packet" << endl;
+          
+          struct ether_arp arph;
+          struct in_addr ipaddr;
           memcpy(&arph, line+14, 28);
           memcpy(&ipaddr.s_addr, arph.arp_tpa, 4);
+          
           cout << "dest: " << inet_ntoa(ipaddr) << endl;
           string routerIP = inet_ntoa(ipaddr);
           string rIP = "10.1.0.1";
@@ -197,15 +208,7 @@ int main(int argc, char **argv){
                         }
 
                 }
-                cout << "interface is : " << interf << endl;
-        }
-        // arp type is 0x0806
-        if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
-          struct ether_arp arph;
-          memcpy(&arph, line+14, 28);
-          
-          // ARP reply consists of the ethernet header and ARP header
-  //        createArpReply(eh, arph, packet_sockets[j], line, "temp", recvaddr);
+          }
         }
       }
     }
