@@ -1,0 +1,5 @@
+1. Send ICMP Reply
+2. Send ARP Reply on same socket as ARP request
+ - MAC address indicated in the ARP reply should be one for the same interface as the IP address indicated in the request
+3. Read ARP request
+4. Accommodate for variable addresses in the range (ex: the video demo requires running ping on 10.1.1.1, should map to r1-eth2) 

@@ -60,6 +60,20 @@ string get_interface(int router, string address){
     return "";
 } */
 
+// matches an input address with it's key in the table
+// ex: 10.0.0.255 would match with 10.0.0.0/16
+/*string match_address(int router, string address){
+    int length = stoi(address.substr(address.length() - 2));
+
+    // the number of digits in the ip address to match
+    // this depends on whether it's /16 or /24
+    int nums_to_match = 0;
+    if (length == 16){
+
+    }
+} */
+
+
 int main(void){
 
     string test_list[5] = {"10.0.0.0/16", "10.1.1.0/24", "apple"};
