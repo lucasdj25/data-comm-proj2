@@ -28,6 +28,20 @@ using namespace std;
 }
 */
 
+void createArpReply(ether_header *eh, arphdr *arph, int sockfd){
+
+  struct ether_header eh2;
+  eh2.ether_dhost = eh->ether_shost;
+  eh2.ether_shost = eh->ether_dhost;
+  eh2.ether_type = eh->ether_type;
+
+  
+}
+
+void createICMPReply(ether_header *eh, iphdr *iphdrph, int sockfd){
+  
+}
+
 int main(int argc, char **argv){
 	int packet_sockets[16];
 	struct ifaddrs *ifaddr, *tmp;
