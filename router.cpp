@@ -72,7 +72,13 @@ int main(int argc, char **argv){
 		if(tmp->ifa_addr->sa_family==AF_PACKET){
 		cout << "Interface: " << tmp->ifa_name << endl;
 
-    cout << "Mac Address: " << tmp->ifa_addr << endl;
+
+		cout << "Mac Address: "; 
+		struct sockaddr_ll *s = (struct sockaddr_ll*)tmp->ifa_addr;
+		for(int k = 0; k < 6; k++) {
+			printf("%02x%c",(s->sll_addr[k]));
+		}
+		cout << endl << endl;
 
 			if(!strncmp(&(tmp->ifa_name[3]),"eth",3)){
 				cout << "Creating Socket on interface " << tmp->ifa_name << endl;
