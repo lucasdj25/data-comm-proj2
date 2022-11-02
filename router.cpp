@@ -21,8 +21,6 @@
 
 //#include "header.hpp"
 
-
-
 using namespace std;
 
 
@@ -41,7 +39,7 @@ void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *l
   eh2->ether_type = htons(ETHERTYPE_ARP);
 
   // Puts header into packet
-  memcpy(&line[0], &eh2, sizeof(ether_header));
+  memcpy(&line[0], eh2, sizeof(ether_header));
 
   /* Arp header */
   struct ether_arp *arph2;
@@ -64,7 +62,7 @@ void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *l
   memcpy(&arph2->arp_tpa, &arph.arp_spa, 4);
 
   // Puts header into packet
-  memcpy(&line[14], &arph2, sizeof(ether_arp));
+  memcpy(&line[14], arph2, sizeof(ether_arp));
 	
   // Sends packet
   cout << "Sending Arp Reply" << endl;
@@ -193,7 +191,8 @@ int main(int argc, char **argv){
           cout << "dest: " << inet_ntoa(ipaddr) << endl;
           string routerIP = inet_ntoa(ipaddr);
           string rIP = "10.1.0.1";
-          if(rIP.compare(routerIP) == 0) {
+          string rIP2 = "10.1.1.1";
+          if(rIP.compare(routerIP) == 0 || rIP2.compare(routerIP) == 0) {
                 cout << "router ip is 10.1.0.1" << endl;
                 char interf[] = {'r','1','-','e','t','h','1','\0'};
                 char interf2[] = {'r','1','-','e','t','h','2','\0'};
