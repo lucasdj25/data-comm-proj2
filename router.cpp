@@ -1,6 +1,7 @@
 #include <iostream>
 #include <map>
 #include <iomanip>
+#include <sstream>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
@@ -19,17 +20,14 @@
 #include <ifaddrs.h>
 #include <net/if_arp.h>
 
-//#include "header.hpp"
-
 using namespace std;
 
 
 void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *line, unsigned char *sourceMac){
 
   /* Ethernet header */
-  struct ether_header *eh2;
-
-//  struct ether_addr *src_mac = ether_aton(sourceMac);
+  struct ether_header EH2;
+  struct ether_header *eh2 = &EH2;
  
   // Source Mac address
   memcpy(&eh2->ether_shost, sourceMac, 6);
@@ -38,11 +36,12 @@ void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *l
   // Ethernet type
   eh2->ether_type = htons(ETHERTYPE_ARP);
 
-  // Puts header into packet
+  // Puts ether header into packet
   memcpy(&line[0], eh2, sizeof(ether_header));
 
   /* Arp header */
-  struct ether_arp *arph2;
+  struct ether_arp ARPH2;
+  struct ether_arp *arph2 = &ARPH2;
 	
   // Fixed header
   arph2->arp_hrd = htons(ARPHRD_ETHER);
@@ -61,7 +60,7 @@ void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *l
   // Target IP address
   memcpy(&arph2->arp_tpa, &arph.arp_spa, 4);
 
-  // Puts header into packet
+  // Puts arp header into packet
   memcpy(&line[14], arph2, sizeof(ether_arp));
 	
   // Sends packet
@@ -72,27 +71,58 @@ void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *l
   }
 }
 
-void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
+struct icmp_header {
+	uint8_t type;
+	uint8_t code;
+	uint16_t checksum;
+	uint8_t identifier;
+	uint8_t seq;
+};
 
+void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
+  char line2[1500];
   // Ethernet header
-  struct ether_header *eh2;
+  struct ether_header EH2;
+  struct ether_header *eh2 = &EH2;
   memcpy(&eh2->ether_shost, &eh.ether_dhost, ETH_ALEN);
   memcpy(&eh2->ether_dhost, &eh.ether_shost, ETH_ALEN);
   eh2->ether_type = htons(ETHERTYPE_IP);
   
-  memcpy(&line[0], eh2, sizeof(ether_header));
+  memcpy(&line2[0], eh2, sizeof(ether_header));
   
   // IP header
-  struct iphdr *ih2;
-  ih2 = &ih;
+  struct iphdr IPH2;
+  struct iphdr *ih2 = &IPH2;
   memcpy(&ih2->saddr, &ih.daddr, sizeof(uint32_t));
   memcpy(&ih2->daddr, &ih.saddr, sizeof(uint32_t));
   
-  memcpy(&line[14], ih2, sizeof(iphdr));
+  memcpy(&line2[14], ih2, sizeof(iphdr));
  		
+  struct icmp_header ICMPH;
+  struct icmp_header *icmph = &ICMPH;
+  memcpy(&icmph, &line[34], sizeof(icmp_header));
+  // ICMP type, 0 is reply
+  memcpy(&icmph->type, 0, 1);
+  // ICMP checksum, start with 0 b/c a new checksum needs to be calculated 
+  memcpy(&icmph->checksum, 0, 2);
+  char data[1500];
+  int dataStart = sizeof(ether_header) + sizeof(iphdr) + sizeof(icmp_header);
+  // length of data is in ip header
+  // the length includes the ip header, icmp header, and the data
+  // so subtract the lengths of headers to get the size of the data
+  int dataEnd = ih2->tot_len - sizeof(iphdr) - sizeof(icmp_header); 
+  memcpy(&data, &line[dataStart], dataEnd);
+
+  // checksum is calculate using the bytes from the icmp header AND data
+  int newChecksum = calcChecksum(icmph, data);
+  // copy the new checksum into the icmp header
+
+  // ICMP sequence number 
+  memcpy(&line2[34], icmph, sizeof(icmph));
+  memcpy(&line2[40], data, dataEnd);
   // Sends packet
   cout << "Sending ICMP Reply" << endl;
-  int n = send(sockfd, line, 42 ,0);
+  int n = send(sockfd, line2, 1500,0);
   cout << "ICMP Reply Sent" << endl;
 }
 
@@ -107,21 +137,24 @@ int main(int argc, char **argv){
 
 	int i = 0;
 
-	// <interface, mac address>
-	map<char*,unsigned char*> macMap;
+	// <interface ip, mac address>
+	map<string,unsigned char*> macMap;
 
 	// Puts all packet sockets into array
 	for(tmp = ifaddr; tmp!=NULL; tmp=tmp->ifa_next){
 		if(tmp->ifa_addr->sa_family==AF_PACKET){
 		cout << "Interface: " << tmp->ifa_name << endl;
-
-		cout << "Mac Address: "; 
+		string iName = string(tmp->ifa_name);
 		struct sockaddr_ll *s = (struct sockaddr_ll*)tmp->ifa_addr;
-		for(int k = 0; k < 6; k++) {
-			printf("%02x%c",(s->sll_addr[k]));
-		}
-		cout << endl << endl;
-		macMap.insert(make_pair(tmp->ifa_name, s->sll_addr));
+		// Mac map uses ip as the key and mac as the value
+		if(iName.compare("lo") == 0)
+			macMap.insert(make_pair("lo", s->sll_addr));
+		else if(iName.compare("r1-eth0") == 0)
+			macMap.insert(make_pair("10.0.0.1", s->sll_addr));
+		else if(iName.compare("r1-eth1") == 0)
+			macMap.insert(make_pair("10.1.0.1", s->sll_addr));
+		else if(iName.compare("r1-eth2") == 0)
+			macMap.insert(make_pair("10.1.1.1", s->sll_addr));
 
 			if(!strncmp(&(tmp->ifa_name[3]),"eth",3)){
 				cout << "Creating Socket on interface " << tmp->ifa_name << endl;
@@ -184,9 +217,9 @@ int main(int argc, char **argv){
         struct ether_header eh;
         memcpy(&eh, line, 14);
 
-        // ip type is 0x0800, for pings
+        // ip type is 0x0800
         if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
-         cout << "Recieved an ICMP packet" << endl;
+         cout << "Received an ICMP packet" << endl;
          
          struct iphdr iph;
          struct in_addr ipDest, ipSrc;
@@ -197,40 +230,20 @@ int main(int argc, char **argv){
         }
         // arp type is 0x0806
         if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
-          cout << "Recieved an ARP packet" << endl;
+          cout << "Received an ARP packet" << endl;
           
           struct ether_arp arph;
           struct in_addr ipaddr;
           memcpy(&arph, line+14, 28);
           memcpy(&ipaddr.s_addr, arph.arp_tpa, 4);
           
-          cout << "dest: " << inet_ntoa(ipaddr) << endl;
+          cout << "dest that was pinged: " << inet_ntoa(ipaddr) << endl;
           string routerIP = inet_ntoa(ipaddr);
           string rIP = "10.1.0.1";
           string rIP2 = "10.1.1.1";
           if(rIP.compare(routerIP) == 0 || rIP2.compare(routerIP) == 0) {
-                cout << "router ip is 10.1.0.1" << endl;
-                char interf[] = {'r','1','-','e','t','h','1','\0'};
-                char interf2[] = {'r','1','-','e','t','h','2','\0'};
-                int stop = 0;
-                for(const auto& n : macMap) {
-
-                        unsigned char macAddr[6];
-                        memcpy(&macAddr, n.second, 6);
-                        if(strcmp(interf,n.first) == 0) {
-                          createArpReply(eh, arph, packet_sockets[j], line, macAddr);
-                        }
-                        else if(strcmp(interf2,n.first) == 0) {
-                          cout << (void *) line << endl;
-                          createArpReply(eh, arph, packet_sockets[j], line, macAddr);
-                        }
-                        stop++;
-                        if (stop == 3){
-                     break;
-                     }
-
-                } 
-
+		cout << "routerIP = " << routerIP << endl;
+		createArpReply(eh, arph, packet_sockets[j], line, macMap[routerIP]);
 
           }
         }
