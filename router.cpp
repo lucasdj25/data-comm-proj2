@@ -41,7 +41,7 @@ void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *l
   eh2->ether_type = htons(ETHERTYPE_ARP);
 
   // Puts header into packet
-  memcpy(&line, &eh2, sizeof(ether_header));
+  memcpy(&line[0], &eh2, sizeof(ether_header));
 
   /* Arp header */
   struct ether_arp *arph2;
@@ -68,7 +68,7 @@ void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *l
 	
   // Sends packet
   cout << "Sending Arp Reply" << endl;
-  int n = sendto(sockfd, line, sizeof(line),0, (struct sockaddr*)&recvaddr,sizeof(recvaddr));
+  int n = send(sockfd, line, 42 ,0);
   cout << n << endl;
   cout << "Arp Reply Sent" << endl;
 }
@@ -204,6 +204,7 @@ int main(int argc, char **argv){
                           createArpReply(eh, arph, packet_sockets[j], line, macAddr, recvaddr);
                         }
                         else if(strcmp(interf2,n.first) == 0) {
+                          cout << (void *) line << endl;
                           createArpReply(eh, arph, packet_sockets[j], line, macAddr, recvaddr);
                         }
 
