@@ -110,23 +110,19 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   memcpy(&line2[0], eh2, sizeof(ether_header));
   
   // IP header
-  struct iphdr IPH2;
-  struct iphdr *ih2 = &IPH2;
-  memcpy(&ih2->saddr, &ih.daddr, sizeof(uint32_t));
-  memcpy(&ih2->daddr, &ih.saddr, sizeof(uint32_t));
+  struct iphdr ih2;
+  memcpy(&ih2, &line[14], sizeof(iphdr));
+  memcpy(&ih2.saddr, &ih.daddr, sizeof(uint32_t));
+  memcpy(&ih2.daddr, &ih.saddr, sizeof(uint32_t));
   
-  memcpy(&line2[14], ih2, sizeof(iphdr));
- 		
-  struct icmp_header ICMPH;
-  struct icmp_header *icmph = &ICMPH;
-  memcpy(&icmph, &line[34], sizeof(icmp_header));
+  struct icmp_header icmph;
+  memcpy(&icmph, &line[34], 6);
   // ICMP type, 0 is reply
-  uint8_t reply = 0;
-  memcpy(&icmph->type, &reply, 1);
+  icmph.type = (1<<0);
+  icmph.checksum = (1<<0);
   
   // ICMP checksum, start with 0 b/c a new checksum needs to be calculated 
-  uint16_t start = 1;
-  memcpy(&icmph->checksum, &start, 2);
+  //memcpy(&icmph->checksum, &start, 2);
   
   char data[1500];
   int dataStart = sizeof(ether_header) + sizeof(iphdr) + sizeof(icmp_header);
@@ -134,12 +130,10 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   // length of data is in ip header
   // the length includes the ip header, icmp header, and the data
   // so subtract the lengths of headers to get the size of the data
-  
-  int dataEnd = ih2->tot_len - sizeof(iphdr) - sizeof(icmp_header); 
+  int dataEnd = htons(ih2.tot_len) - sizeof(iphdr) - sizeof(icmp_header); 
   memcpy(&data, &line[dataStart], dataEnd);
 
-
-  char data_for_checksum[1500 + sizeof(icmp_header)];
+  char data_for_checksum[dataEnd];
   
   // put ICMP header into array
   memcpy(&data_for_checksum[0], &icmph, sizeof(struct icmp_header));
@@ -147,15 +141,14 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   // put data into array
   memcpy(&data_for_checksum[sizeof(icmp_header)], &data, sizeof(data));
   
-  
   // checksum is calculate using the bytes from the icmp header AND data
-  uint16_t newChecksum = checkSum(icmph, sizeof(icmph));
+  uint16_t newChecksum = checkSum(data_for_checksum, dataEnd);
   
-  memcpy(&icmph->checksum, &newChecksum, 2);
   // copy the new checksum into the icmp header
+  icmph.checksum = newChecksum;
 
   // ICMP sequence number 
-  memcpy(&line2[34], icmph, sizeof(icmph));
+  memcpy(&line2[34], &icmph, sizeof(icmph));
   memcpy(&line2[40], data, dataEnd);
   // Sends packet
   cout << "Sending ICMP Reply" << endl;
@@ -259,9 +252,7 @@ int main(int argc, char **argv){
          cout << "Received an ICMP packet" << endl;
          
          struct iphdr iph;
-         struct in_addr ipDest, ipSrc;
          memcpy(&iph, line+14, 20);
-         
          createICMPReply(eh, iph, packet_sockets[j], line);
         
         }
@@ -274,14 +265,11 @@ int main(int argc, char **argv){
           memcpy(&arph, line+14, 28);
           memcpy(&ipaddr.s_addr, arph.arp_tpa, 4);
           
-          cout << "dest that was pinged: " << inet_ntoa(ipaddr) << endl;
           string routerIP = inet_ntoa(ipaddr);
           string rIP = "10.1.0.1";
           string rIP2 = "10.1.1.1";
           if(rIP.compare(routerIP) == 0 || rIP2.compare(routerIP) == 0) {
-		cout << "routerIP = " << routerIP << endl;
 		createArpReply(eh, arph, packet_sockets[j], line, macMap[routerIP]);
-
           }
         }
       }
