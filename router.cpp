@@ -71,6 +71,25 @@ void createArpReply(ether_header &eh, ether_arp &arph, const int sockfd, char *l
   }
 }
 
+uint16_t checkSum(const void* data, size_t len){
+	auto p = reinterpret_cast<const uint16_t*>(data);
+	uint32_t sum = 0;
+	
+	// if the length is odd
+	if (len & 1){
+		sum = reinterpret_cast<const uint8_t*>(p)[len - 1];
+	}
+	len /= 2;
+	
+	while (len--){
+		sum += *p++;
+		if (sum & 0xffff0000){
+			sum = (sum >> 16) + (sum & 0xffff);
+		}	
+	}
+	return static_cast<uint16_t>(~sum);
+}
+
 struct icmp_header {
 	uint8_t type;
 	uint8_t code;
@@ -102,19 +121,37 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   struct icmp_header *icmph = &ICMPH;
   memcpy(&icmph, &line[34], sizeof(icmp_header));
   // ICMP type, 0 is reply
-  memcpy(&icmph->type, 0, 1);
+  uint8_t reply = 0;
+  memcpy(&icmph->type, &reply, 1);
+  
   // ICMP checksum, start with 0 b/c a new checksum needs to be calculated 
-  memcpy(&icmph->checksum, 0, 2);
+  uint16_t start = 1;
+  memcpy(&icmph->checksum, &start, 2);
+  
   char data[1500];
   int dataStart = sizeof(ether_header) + sizeof(iphdr) + sizeof(icmp_header);
+  
   // length of data is in ip header
   // the length includes the ip header, icmp header, and the data
   // so subtract the lengths of headers to get the size of the data
+  
   int dataEnd = ih2->tot_len - sizeof(iphdr) - sizeof(icmp_header); 
   memcpy(&data, &line[dataStart], dataEnd);
 
+
+  char data_for_checksum[1500 + sizeof(icmp_header)];
+  
+  // put ICMP header into array
+  memcpy(&data_for_checksum[0], &icmph, sizeof(struct icmp_header));
+  
+  // put data into array
+  memcpy(&data_for_checksum[sizeof(icmp_header)], &data, sizeof(data));
+  
+  
   // checksum is calculate using the bytes from the icmp header AND data
-  int newChecksum = calcChecksum(icmph, data);
+  uint16_t newChecksum = checkSum(icmph, sizeof(icmph));
+  
+  memcpy(&icmph->checksum, &newChecksum, 2);
   // copy the new checksum into the icmp header
 
   // ICMP sequence number 
