@@ -119,37 +119,36 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   memcpy(&icmph, &line[34], 6);
   // ICMP type, 0 is reply
   icmph.type = (1<<0);
+
+  // ICMP checksum, start with 0 b/c a new checksum needs to be calculated 
   icmph.checksum = (1<<0);
   
-  // ICMP checksum, start with 0 b/c a new checksum needs to be calculated 
-  //memcpy(&icmph->checksum, &start, 2);
-  
-  char data[1500];
   int dataStart = sizeof(ether_header) + sizeof(iphdr) + sizeof(icmp_header);
   
   // length of data is in ip header
   // the length includes the ip header, icmp header, and the data
   // so subtract the lengths of headers to get the size of the data
-  int dataEnd = htons(ih2.tot_len) - sizeof(iphdr) - sizeof(icmp_header); 
-  memcpy(&data, &line[dataStart], dataEnd);
+  int dataLen = htons(ih2.tot_len) - sizeof(iphdr) - sizeof(icmp_header); 
+  char data[dataLen];
+  memcpy(&data, &line[dataStart], dataLen);
 
-  char data_for_checksum[dataEnd];
+  char data_for_checksum[dataLen];
   
   // put ICMP header into array
   memcpy(&data_for_checksum[0], &icmph, sizeof(struct icmp_header));
   
   // put data into array
-  memcpy(&data_for_checksum[sizeof(icmp_header)], &data, sizeof(data));
+  memcpy(&data_for_checksum[sizeof(icmp_header)], &data, dataLen);
   
   // checksum is calculate using the bytes from the icmp header AND data
-  uint16_t newChecksum = checkSum(data_for_checksum, dataEnd);
+  uint16_t newChecksum = checkSum(data_for_checksum, dataLen+sizeof(icmp_header));
   
   // copy the new checksum into the icmp header
   icmph.checksum = newChecksum;
 
   // ICMP sequence number 
   memcpy(&line2[34], &icmph, sizeof(icmph));
-  memcpy(&line2[40], data, dataEnd);
+  memcpy(&line2[40], data, dataLen);
   // Sends packet
   cout << "Sending ICMP Reply" << endl;
   int n = send(sockfd, line2, 1500,0);
@@ -277,3 +276,4 @@ int main(int argc, char **argv){
   }
   freeifaddrs(ifaddr);
 }
+
