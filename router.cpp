@@ -114,14 +114,15 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   memcpy(&ih2, &line[14], sizeof(iphdr));
   memcpy(&ih2.saddr, &ih.daddr, sizeof(uint32_t));
   memcpy(&ih2.daddr, &ih.saddr, sizeof(uint32_t));
+  memcpy(&line2[14], &ih2, sizeof(iphdr));
   
   struct icmp_header icmph;
   memcpy(&icmph, &line[34], 6);
   // ICMP type, 0 is reply
-  icmph.type = (1<<0);
+  icmph.type = (0<<0);
 
   // ICMP checksum, start with 0 b/c a new checksum needs to be calculated 
-  icmph.checksum = (1<<0);
+  icmph.checksum = (0<<0);
   
   int dataStart = sizeof(ether_header) + sizeof(iphdr) + sizeof(icmp_header);
   
@@ -129,10 +130,10 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   // the length includes the ip header, icmp header, and the data
   // so subtract the lengths of headers to get the size of the data
   int dataLen = htons(ih2.tot_len) - sizeof(iphdr) - sizeof(icmp_header); 
-  char data[dataLen];
+  char data[1500];
   memcpy(&data, &line[dataStart], dataLen);
 
-  char data_for_checksum[dataLen];
+  char data_for_checksum[1500];
   
   // put ICMP header into array
   memcpy(&data_for_checksum[0], &icmph, sizeof(struct icmp_header));
@@ -151,7 +152,7 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   memcpy(&line2[40], data, dataLen);
   // Sends packet
   cout << "Sending ICMP Reply" << endl;
-  int n = send(sockfd, line2, 1500,0);
+  int n = send(sockfd, line2, sizeof(ether_header)+htons(ih2.tot_len),0);
   cout << "ICMP Reply Sent" << endl;
 }
 
