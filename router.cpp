@@ -156,6 +156,55 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   cout << "ICMP Reply Sent" << endl;
 }
 
+void createArpRequest(const int sockfd, unsigned char *sourceMac, unsigned char *sourceIP, unsigned char *targetIP){
+	  char line[1500];	
+		
+	  /* Ethernet header */
+	  struct ether_header EH2;
+	  struct ether_header *eh2 = &EH2;
+	 
+	  // Source Mac address
+	  memcpy(&eh2->ether_shost, sourceMac, 6);
+	  // Target Mac address
+	  memcpy(&eh2->ether_dhost, ether_aton("00:00:00:00:00:00"), 6);
+	  // Ethernet type
+	  eh2->ether_type = htons(ETHERTYPE_ARP);
+
+	  // Puts ether header into packet
+	  memcpy(&line[0], eh2, sizeof(ether_header));
+
+	  /* Arp header */
+	  struct ether_arp ARPH2;
+	  struct ether_arp *arph2 = &ARPH2;
+		
+	  // Fixed header
+	  arph2->arp_hrd = htons(ARPHRD_ETHER);
+	  arph2->arp_pro = htons(ETHERTYPE_IP);
+	  arph2->arp_hln = ETH_ALEN;
+	  arph2->arp_pln = 4;
+	  arph2->arp_op = htons(ARPOP_REQUEST);
+		
+	  // Source Mac address
+	  memcpy(&arph2->arp_sha, sourceMac, 6);
+	  // Target Mac address
+	  memcpy(&arph2->arp_tha, ether_aton("00:00:00:00:00:00"), 6);
+	  
+	  // Source IP address
+	  memcpy(&arph2->arp_spa, sourceIP, 4);
+	  // Target IP address 
+	  memcpy(&arph2->arp_tpa, targetIP, 4);
+
+	  // Puts arp header into packet
+	  memcpy(&line[14], arph2, sizeof(ether_arp));
+		
+	  // Sends packet
+	  cout << "Sending Arp Request" << endl;
+	  int n = send(sockfd, line, 42 ,0);
+	  if(n == 42){
+	  	cout << "Arp Request Sent" << endl;
+	  }
+}
+
 int main(int argc, char **argv){
 	int packet_sockets[16];
 	struct ifaddrs *ifaddr, *tmp;
@@ -253,16 +302,34 @@ int main(int argc, char **argv){
      		
          struct iphdr iph;
          memcpy(&iph, line+14, 20);
-         string routerIP = inet_ntoa(iph.daddr);
+         
+         struct in_addr dst_addr;
+         dst_addr.s_addr = iph.daddr;
+         string routerIP = inet_ntoa(dst_addr);
          
          // check if packet's destination is the router (IP address)
          if(macMap.count(routerIP) == 0){
+         	cout << "Received a packet not for this router" << endl;
          	// if it is not the destination, forward the packet/error check
 		 	// Checksum and TTL
-		 	// Create ARP Request
-		 	// Forward based on routing table
-		 	// Send packet
+		 		// If checksum is incorrect || TTL <= 0, throw out packet
+		 	
+		 	// Check routing table
+		 
+		 		// If there is an entry
+		 			// Create & send ARP Request to entry
+		 			
+		 			// Wait for ARP reply (use settimeout)
+		 				// Received ARP reply, send packet 
+		 				
+		 				// No ARP reply, send ICMP Destination unreachable packet 
+		 			
+		 		// If there is no entry
+		 			// Send ICMP Destination unreachable packet
+		 	
+		 	
          }else{
+         cout << "Recieved a packet for this router" << endl;
          	// if it is the destination, send the icmp reply
          	createICMPReply(eh, iph, packet_sockets[j], line);
          }
