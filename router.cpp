@@ -194,7 +194,7 @@ int main(int argc, char **argv){
 					perror("socket");
 					return 2;
 				}
-
+ 
 				if(bind(packet_sockets[i],tmp->ifa_addr,sizeof(struct sockaddr_ll))==-1){
 					perror("bind");
 				}
@@ -249,11 +249,24 @@ int main(int argc, char **argv){
 
         // ip type is 0x0800
         if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
-         cout << "Received an ICMP packet" << endl;
-         
+         cout << "Received an ICMP packet" << endl;        
+     		
          struct iphdr iph;
          memcpy(&iph, line+14, 20);
-         createICMPReply(eh, iph, packet_sockets[j], line);
+         string routerIP = inet_ntoa(iph.daddr);
+         
+         // check if packet's destination is the router (IP address)
+         if(macMap.count(routerIP) == 0){
+         	// if it is not the destination, forward the packet/error check
+		 	// Checksum and TTL
+		 	// Create ARP Request
+		 	// Forward based on routing table
+		 	// Send packet
+         }else{
+         	// if it is the destination, send the icmp reply
+         	createICMPReply(eh, iph, packet_sockets[j], line);
+         }
+         
         
         }
         // arp type is 0x0806
@@ -266,11 +279,7 @@ int main(int argc, char **argv){
           memcpy(&ipaddr.s_addr, arph.arp_tpa, 4);
           
           string routerIP = inet_ntoa(ipaddr);
-          string rIP = "10.1.0.1";
-          string rIP2 = "10.1.1.1";
-          if(rIP.compare(routerIP) == 0 || rIP2.compare(routerIP) == 0) {
-		createArpReply(eh, arph, packet_sockets[j], line, macMap[routerIP]);
-          }
+	  createArpReply(eh, arph, packet_sockets[j], line, macMap[routerIP]);
         }
       }
     }
