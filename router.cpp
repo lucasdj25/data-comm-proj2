@@ -2,6 +2,7 @@
 #include <map>
 #include <iomanip>
 #include <sstream>
+#include <fstream>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
@@ -22,6 +23,17 @@
 
 using namespace std;
 
+struct routingTableRow {
+	string networkPrefix;
+	string nextHopDevice;
+	string interfaceName;
+	
+/*	routingTableRow(string networkPrefix, string nextHopDevice, string interfaceName){
+		networkPrefix = networkPrefix;
+		nextHopDevice = nextHopDevice;
+		interfaceName = interfaceName;
+	} */
+};
 
 void createArpRequest(const int sockfd, ether_header &eh, iphdr &iph){
       char line[1500];  
@@ -87,6 +99,53 @@ struct interface {
 };
 
 int main(int argc, char **argv){
+
+	int tableLen = 0;
+	routingTableRow table[5];
+
+	if(argc < 2){
+		cout << "[ERROR] Filename for routing table is required" << endl;
+		exit(1);
+	}
+	
+
+
+	 ifstream inputFile(argv[1]);
+
+	    string text;
+	    if(inputFile.is_open()) {
+		// Read all file contents into a string
+		text.assign( (std::istreambuf_iterator<char>(inputFile) ),
+		           (std::istreambuf_iterator<char>()));
+
+		inputFile.close();
+	    }
+
+	    istringstream tokWords(text);
+	    string word;
+
+	    string networkPrefix;
+	    string nextHopDevice;
+	    string interfaceName;
+	    int k = 3;
+	    while(tokWords >> word) {
+	    	if(k==3){
+		   table[tableLen].networkPrefix = word;
+	    	}else if(k==2){
+	    	  table[tableLen].nextHopDevice = word;
+	    	}else if(k==1){
+	    	   table[tableLen].interfaceName = word;
+	    	}
+	    	k--;
+	    	
+	    	if(k==0){
+	    	   tableLen++;
+	    	   k = 3;
+	    	}
+
+	    }
+	    
+
 	int packet_sockets[16];
 	struct ifaddrs *ifaddr, *tmp;
 
