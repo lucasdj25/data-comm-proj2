@@ -241,17 +241,51 @@ int main(int argc, char **argv){
 					 // if packet is NOT for the router
 					if(macMap.count(destIP) == 0) {
 						cout << "ICMP Packet not for router" << endl;
+						// ARP to next hop IP address
 						string routerIP = getRouterIP(table, tableLen, destIP);
-						createArpRequest(macMap[routerIP].sock, eh, iph, routerIP); 	
-							// forward based on routing table
-							// create arp req
-							// send arp req
-					 }
-			//		 else
-						 createICMPReply(eh, iph, packet_sockets[j], line);
+						createArpRequest(macMap[routerIP].sock, eh, iph, routerIP); 
+						cout << "Sent ARP packet to next hop, waiting for reply" << endl;
+						
+						// set timeout for ARP response
+						struct timeval timeout;
+						timeout.tv_sec=2;
+						timeout.tv_usec=0;
+
+						setsockopt(macMap[routerIP].sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+						char arpResponse[5000];
+						int recv = recvfrom(macMap[routerIP].sock, arpResponse, 5000,0, (struct sockaddr*)&recvaddr, &recvaddrlen);
+						// if no ARP response is received
+						if(recv == -1){
+							if(errno == EWOULDBLOCK){
+							// send icmp destination unreachable packet
+							cout << "No ARP response received" << endl;
+							}
+						}
+						cout << "Received ARP response, building new ethernet header" << endl;
+						// if ARP Response is received
+							// construct new ethernet header
+							struct ether_header response_eh;
+							memcpy(&response_eh, arpResponse, 14);							
+ 							
+ 							struct ether_header EH2;
+							struct ether_header *eh2 = &EH2;
+							memcpy(&eh2->ether_shost, &response_eh.ether_dhost, ETH_ALEN);
+							memcpy(&eh2->ether_dhost, &response_eh.ether_shost, ETH_ALEN);
+							eh2->ether_type = htons(ETHERTYPE_IP);
+
+							memcpy(&line[0], eh2, sizeof(ether_header));
+ 							
+							// forward packet on same socket
+							cout << "Forwarding packet" << endl;
+							send(macMap[routerIP].sock, line, n, 0);
+							
+					 }else{
+						// if packet is for our router
+						createICMPReply(eh, iph, packet_sockets[j], line);
+					}
 					
 				}
-					// arp type is 0x0806
+				// arp type is 0x0806
 				if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
 					cout << "Received an ARP packet" << endl;
 					  
