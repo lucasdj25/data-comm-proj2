@@ -55,10 +55,23 @@ void createArpReply(ether_header &eh, ether_arp &arph, int sockfd, char *line, u
   }
 }
 
-void sendICMPTimeExceeded(int sockfd, iphdr &ih, char *line){
+void sendICMPTimeExceeded(int sockfd, iphdr &ih){
   uint8_t type = 11; // indicates time exceeded message
   uint8_t code = 0;  // 0 is the time exceeded type
 
+  char icmp_response[1500];
+
+  memcpy(&icmp_response, &iphdr, sizeof(iphdr));
+
+  struct icmp_header icmph;
+  icmph.type = type;
+  icmph.code = code;
+  icmph.checksum = ih->checksum;
+  
+  memcpy(&icmp_response[20], &icmph, 48);
+
+  size_t send_size = sizeof(icmp_header) + sizeof(iphdr);
+  int n = send(sockfd, icmp_response, send_size, 0);
 
 
 }
@@ -75,7 +88,7 @@ void sendICMPUnreachable(iphdr &ih, int sockfd, std::string code_type){
   struct icmp_header icmph; // the following lines will probably need to be fixed
   icmph.type = type;
   icmph.code = code;
-  icmph.checksum = iphdr->checksum;
+  icmph.checksum = ih->checksum;
 
   memcpy(&icmp_response[20], &icmph, 48);
 
