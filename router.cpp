@@ -23,17 +23,6 @@
 
 using namespace std;
 
-struct routingTableRow {
-	string networkPrefix;
-	string nextHopDevice;
-	string interfaceName;
-	
-/*	routingTableRow(string networkPrefix, string nextHopDevice, string interfaceName){
-		networkPrefix = networkPrefix;
-		nextHopDevice = nextHopDevice;
-		interfaceName = interfaceName;
-	} */
-};
 
 void createArpRequest(const int sockfd, ether_header &eh, iphdr &iph){
       char line[1500];  
@@ -69,16 +58,15 @@ void createArpRequest(const int sockfd, ether_header &eh, iphdr &iph){
       // Target Mac address
       memcpy(&arph2->arp_tha, ether_aton("00:00:00:00:00:00"), 6); 
        
-	struct in_addr src, dest;
-	//src.s_addr = iph.saddr; 
-	//dest.s_addr = iph.daddr;
-	src.s_addr = inet_addr("10.1.1.1");
-	dest.s_addr = inet_addr("10.1.1.5");
+	  struct in_addr src, dest;
+	  // src ip is the router's ip of the interface that the dest ip is on
+	  src.s_addr = iph.saddr; 
+	  dest.s_addr = iph.daddr;
+
       // Source IP address
       memcpy(&arph2->arp_spa, &src, sizeof(uint32_t)); 
       // Target IP address 
       memcpy(&arph2->arp_tpa, &dest, sizeof(uint32_t)); 
-	cout << "Src from icmp: " << inet_ntoa(src) << "\tdest from icmp: " << inet_ntoa(dest) << endl;
 
       // Puts arp header into packet
       memcpy(&line[14], arph2, sizeof(ether_arp));
@@ -91,12 +79,12 @@ void createArpRequest(const int sockfd, ether_header &eh, iphdr &iph){
       }   
 }
 
-
 struct interface {
     unsigned char macaddr[8];
     string name;
     int sock;
 };
+
 
 int main(int argc, char **argv){
 
@@ -109,42 +97,37 @@ int main(int argc, char **argv){
 	}
 	
 
+	ifstream inputFile(argv[1]);
 
-	 ifstream inputFile(argv[1]);
-
-	    string text;
-	    if(inputFile.is_open()) {
+	string text;
+	if(inputFile.is_open()) {
 		// Read all file contents into a string
 		text.assign( (std::istreambuf_iterator<char>(inputFile) ),
-		           (std::istreambuf_iterator<char>()));
+		   (std::istreambuf_iterator<char>()));
 
 		inputFile.close();
-	    }
+	}
 
-	    istringstream tokWords(text);
-	    string word;
+	istringstream tokWords(text);
+	string word;
 
-	    string networkPrefix;
-	    string nextHopDevice;
-	    string interfaceName;
-	    int k = 3;
-	    while(tokWords >> word) {
-	    	if(k==3){
-		   table[tableLen].networkPrefix = word;
-	    	}else if(k==2){
-	    	  table[tableLen].nextHopDevice = word;
-	    	}else if(k==1){
-	    	   table[tableLen].interfaceName = word;
-	    	}
-	    	k--;
-	    	
-	    	if(k==0){
-	    	   tableLen++;
-	    	   k = 3;
-	    	}
-
-	    }
+	int numWords = 1;
+	while(tokWords >> word) {
+		if(numWords % 3 == 1){
+			table[tableLen].networkPrefix = word;
+		}
+		else if(numWords % 3 == 2){
+			table[tableLen].nextHopDevice = word;
+		}
+		else if(numWords % 3 == 0){
+			table[tableLen].interfaceName = word;
+			tableLen++;
+		}
+		numWords++;
+	}
 	    
+	string s1 = "10.3.0.2";
+	cout << "Router IP for 10.3.0.2 = " << getRouterIP(table, tableLen, s1) << endl;
 
 	int packet_sockets[16];
 	struct ifaddrs *ifaddr, *tmp;
@@ -162,28 +145,9 @@ int main(int argc, char **argv){
 	// Puts all packet sockets into array
 	for(tmp = ifaddr; tmp!=NULL; tmp=tmp->ifa_next){
 		if(tmp->ifa_addr->sa_family==AF_PACKET){
-		cout << "Interface: " << tmp->ifa_name << endl;
-		string iName = string(tmp->ifa_name);
-		struct sockaddr_ll *s = (struct sockaddr_ll*)tmp->ifa_addr;
-/*
-		// Mac map uses ip as the key and mac as the value
-		if(iName.compare("lo") == 0)
-			macMap.insert(make_pair("lo", s->sll_addr));
-		else if(iName.compare("r1-eth0") == 0)
-			macMap.insert(make_pair("10.0.0.1", s->sll_addr));
-		else if(iName.compare("r1-eth1") == 0)
-			macMap.insert(make_pair("10.1.0.1", s->sll_addr));
-		else if(iName.compare("r1-eth2") == 0)
-			macMap.insert(make_pair("10.1.1.1", s->sll_addr));
-		else if(iName.compare("r2-eth0") == 0)
-			macMap.insert(make_pair("10.0.0.2", s->sll_addr));
-		else if(iName.compare("r2-eth1") == 0)
-			macMap.insert(make_pair("10.3.0.1", s->sll_addr));
-		else if(iName.compare("r2-eth2") == 0)
-			macMap.insert(make_pair("10.3.1.1", s->sll_addr));
-		else if(iName.compare("r2-eth3") == 0)
-			macMap.insert(make_pair("10.3.4.1", s->sll_addr));
-*/
+			cout << "Interface: " << tmp->ifa_name << endl;
+			string iName = string(tmp->ifa_name);
+			struct sockaddr_ll *s = (struct sockaddr_ll*)tmp->ifa_addr;
 			if(!strncmp(&(tmp->ifa_name[3]),"eth",3)){
 				cout << "Creating Socket on interface " << tmp->ifa_name << endl;
 
@@ -193,29 +157,36 @@ int main(int argc, char **argv){
 					perror("socket");
 					return 2;
 				}
-				
-				// Mac map uses ip as the key and mac as the value
+
+			    // Mac map uses ip as the key and the value
+                // is the mac, interface name, and socket number
+                struct interface face;
+                memcpy(&face.macaddr, s->sll_addr, 8);
+                face.name = iName;
+                face.sock = packet_sockets[i];
+
                 if(iName.compare("r1-eth0") == 0) {
-                    struct interface eth0;
-                    memcpy(&eth0.macaddr, s->sll_addr, 8); 
-                    eth0.name = iName;
-                    eth0.sock = packet_sockets[i];
-                    macMap.insert(make_pair("10.0.0.1", eth0));
-                }   
+                    macMap.insert(make_pair("10.0.0.1", face));
+                }
                 else if(iName.compare("r1-eth1") == 0) {
-                    struct interface eth1;
-                    memcpy(&eth1.macaddr, s->sll_addr, 8); 
-                    eth1.name = iName;
-                    eth1.sock = packet_sockets[i];
-                    macMap.insert(make_pair("10.1.0.1", eth1));
-                }   
+                    macMap.insert(make_pair("10.1.0.1", face));
+                }
                 else if(iName.compare("r1-eth2") == 0) {
-                    struct interface eth2;
-                    memcpy(&eth2.macaddr, s->sll_addr, 8); 
-                    eth2.name = iName;
-                    eth2.sock = packet_sockets[i];
-                    macMap.insert(make_pair("10.1.1.1", eth2));
-                }  
+                    macMap.insert(make_pair("10.1.1.1", face));
+                }
+                else if(iName.compare("r2-eth0") == 0) {
+                    macMap.insert(make_pair("10.0.0.2", face));
+                }
+                else if(iName.compare("r2-eth1") == 0) {
+                    macMap.insert(make_pair("10.3.0.1", face));
+                }
+                else if(iName.compare("r2-eth2") == 0) {
+                    macMap.insert(make_pair("10.3.1.1", face));
+                }
+                else if(iName.compare("r2-eth3") == 0) {
+                    macMap.insert(make_pair("10.3.4.1", face));
+                }
+				
 				if(bind(packet_sockets[i],tmp->ifa_addr,sizeof(struct sockaddr_ll))==-1){
 					perror("bind");
 				}
@@ -224,20 +195,6 @@ int main(int argc, char **argv){
 			}
 		}
 	}
-
-	// Prints mac address with their corresponding interfaces
-/*
-	cout << "Mac Address Map" << endl;
-	for(const auto& n : macMap) {
-		unsigned char macAddr[6];
-		memcpy(&macAddr, n.second, 6);
-		stringstream ss;
-		for(unsigned char c : macAddr)
-			ss << setw(2) << setprecision(2) << setfill('0') << hex << (unsigned)c << " ";
-		string sMac = ss.str();
-		cout << "Mac addr on interface " << n.first << " is: " << sMac << endl;
-	}
-*/
 
 	// Creates a fd_set with all the sockets
 	fd_set fds;
@@ -323,7 +280,7 @@ int main(int argc, char **argv){
 			  // send arp from router to host
 		  }
           if(rIP.compare(routerIP) == 0 || rIP2.compare(routerIP) == 0) {
-		createArpReply(eh, arph, packet_sockets[j], line, macMap[routerIP].macaddr);
+			createArpReply(eh, arph, packet_sockets[j], line, macMap[routerIP].macaddr);
           }
         }
       }
