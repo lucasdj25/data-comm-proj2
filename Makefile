@@ -1,6 +1,8 @@
 CC = g++
 CFLAGS = -g
 
+all: router clean
+
 router: router.o reply.o routingtable.o
 	sudo $(CC) $(CFLAGS) -o $@ $^ 
 
