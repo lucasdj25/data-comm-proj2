@@ -243,6 +243,11 @@ int main(int argc, char **argv){
 						cout << "ICMP Packet not for router" << endl;
 						// ARP to next hop IP address
 						string routerIP = getRouterIP(table, tableLen, destIP);
+						if(routerIP.compare("10.0.0.2") == 0){
+							routerIP = "10.0.0.1";
+						}else if(routerIP.compare("10.0.0.1") == 0){
+							routerIP="10.0.0.2";
+						}
 						createArpRequest(macMap[routerIP].sock, eh, iph, routerIP); 
 						cout << "Sent ARP packet to next hop, waiting for reply" << endl;
 						
