@@ -1,12 +1,12 @@
-#include <iostream>			// cout
-#include <cstring>			// memcpy
+#include <iostream>			  // cout
+#include <cstring>			  // memcpy
 #include <net/ethernet.h>	// ether header
 #include <net/if_arp.h>		// arp header
 #include <netinet/ip.h>		// ip header
 #include <sys/socket.h>		// send
 #include <sys/types.h>		// uint8...
 #include <arpa/inet.h>		// htons
-#include "reply.h"
+#include "reply.h" 
 
 void createArpReply(ether_header &eh, ether_arp &arph, int sockfd, char *line, unsigned char *sourceMac){
   /* Ethernet header */
@@ -55,6 +55,34 @@ void createArpReply(ether_header &eh, ether_arp &arph, int sockfd, char *line, u
   }
 }
 
+void sendICMPTimeExceeded(int sockfd, iphdr &ih, char *line){
+  uint8_t type = 11; // indicates time exceeded message
+  uint8_t code = 0;  // 0 is the time exceeded type
+
+
+
+}
+
+// for code_type, pass in "net" for net unreachable, "host" for host unreachable
+void sendICMPUnreachable(iphdr &ih, int sockfd, std::string code_type){
+
+  uint8_t type = 3; // type for dest unreachable
+  uint8_t code = code_type.compare("net") == 1 ? 0 : 1; // set code based on input unreachable type (net or host)
+
+  char icmp_response[1500]; // the response including the ip header and the icmp header
+
+  memcpy(&icmp_response, &iphdr, sizeof(iphdr)); // copy ip header into icmp response
+  struct icmp_header icmph; // the following lines will probably need to be fixed
+  icmph.type = type;
+  icmph.code = code;
+  icmph.checksum = iphdr->checksum;
+
+  memcpy(&icmp_response[20], &icmph, 48);
+
+  size_t send_size = sizeof(icmp_header) + sizeof(iphdr);
+  int n = send(sockfd, icmp_response, send_size, 0);
+
+}
 
 void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
 
@@ -134,4 +162,6 @@ uint16_t checkSum(const void* data, size_t len){
     }
     return static_cast<uint16_t>(~sum);
 }
+
+
 
