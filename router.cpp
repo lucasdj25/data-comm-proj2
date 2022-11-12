@@ -20,11 +20,12 @@
 #include <ifaddrs.h>
 #include <net/if_arp.h>
 #include "reply.h"
+#include "routingtable.h"
 
 using namespace std;
 
 
-void createArpRequest(const int sockfd, ether_header &eh, iphdr &iph){
+void createArpRequest(const int sockfd, ether_header &eh, iphdr &iph, string routerIP){
       char line[1500];  
        
       /* Ethernet header */
@@ -60,7 +61,7 @@ void createArpRequest(const int sockfd, ether_header &eh, iphdr &iph){
        
 	  struct in_addr src, dest;
 	  // src ip is the router's ip of the interface that the dest ip is on
-	  src.s_addr = iph.saddr; 
+	  src.s_addr = inet_addr(routerIP.c_str()); 
 	  dest.s_addr = iph.daddr;
 
       // Source IP address
@@ -209,83 +210,62 @@ int main(int argc, char **argv){
 	while(1){
 		fd_set tmp = fds;
 		int nn=select(FD_SETSIZE, &tmp, NULL, NULL, NULL);
-    for(int j=0; j<i;j++){
-      if(FD_ISSET(packet_sockets[j],&tmp)){
-        cout << "Got something on the socket" << endl;
+		for(int j=0; j<i;j++){
+			if(FD_ISSET(packet_sockets[j],&tmp)){
+				cout << "Got something on the socket" << endl;
 
-        char line[5000];
-        struct sockaddr_ll recvaddr;
-        unsigned int recvaddrlen=sizeof(struct sockaddr_ll);
-  
-        int n = recvfrom(packet_sockets[j], line, 5000,0,
-          (struct sockaddr*)&recvaddr, &recvaddrlen);
+				char line[5000];
+				struct sockaddr_ll recvaddr;
+				unsigned int recvaddrlen=sizeof(struct sockaddr_ll);
+		  
+				int n = recvfrom(packet_sockets[j], line, 5000,0,
+				  (struct sockaddr*)&recvaddr, &recvaddrlen);
 
-        if(recvaddr.sll_pkttype==PACKET_OUTGOING)
-          continue;
+				if(recvaddr.sll_pkttype==PACKET_OUTGOING)
+				  continue;
 
-        struct ether_header eh;
-        memcpy(&eh, line, 14);
+				struct ether_header eh;
+				memcpy(&eh, line, 14);
 
-        // ip type is 0x0800
-        if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
-         cout << "Received an ICMP packet" << endl;
-         
-         struct iphdr iph;
-         struct in_addr ipaddr1, ipaddr2;
-         memcpy(&iph, line+14, 20);
+				// ip type is 0x0800
+				if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
+					cout << "Received an ICMP packet" << endl;
+					 
+					struct iphdr iph;
+					struct in_addr ipaddr;
+					memcpy(&iph, line+14, 20);
 
-		 ipaddr1.s_addr = iph.saddr;
-		 ipaddr2.s_addr = iph.daddr;
+					ipaddr.s_addr = iph.daddr;
+					string destIP = inet_ntoa(ipaddr);
 
-         string sourceIP = inet_ntoa(ipaddr1);
-		 string destIP = inet_ntoa(ipaddr2);
-		cout << "Src ip from ip packet: " << sourceIP << endl;
-		cout << "Dest ip from ip packet: " << destIP << endl;
-		 // check if packet is for the router
-		 if(macMap.count(destIP) == 0) {
-			cout << "ICMP Packet not for router" << endl;
-			string subDest = destIP.substr(0,6);
-			string routerIP;
-			for(const auto& k: macMap) {
-				string subKey = k.first.substr(0,6);
-				if(subDest.compare(subKey) == 0) {
-					cout << "here" << endl;	
-					routerIP = k.first;
+					 // if packet is NOT for the router
+					if(macMap.count(destIP) == 0) {
+						cout << "ICMP Packet not for router" << endl;
+						string routerIP = getRouterIP(table, tableLen, destIP);
+						createArpRequest(macMap[routerIP].sock, eh, iph, routerIP); 	
+							// forward based on routing table
+							// create arp req
+							// send arp req
+					 }
+			//		 else
+						 createICMPReply(eh, iph, packet_sockets[j], line);
+					
+				}
+					// arp type is 0x0806
+				if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
+					cout << "Received an ARP packet" << endl;
+					  
+					struct ether_arp arph;
+					struct in_addr ipaddr;
+					memcpy(&arph, line+14, 28);
+					memcpy(&ipaddr.s_addr, arph.arp_tpa, 4);
+				 
+					string routerIP = inet_ntoa(ipaddr);
+					createArpReply(eh, arph, packet_sockets[j], line, macMap[routerIP].macaddr);
 				}
 			}
-			createArpRequest(macMap[routerIP].sock, eh, iph); 	
-				// forward based on routing table
-				// create arp req
-				// send arp req
-         }
-//		 else
-			 createICMPReply(eh, iph, packet_sockets[j], line);
-        
-        }
-        // arp type is 0x0806
-        if(ntohs(eh.ether_type) == ETHERTYPE_ARP) {
-          cout << "Received an ARP packet" << endl;
-          
-          struct ether_arp arph;
-          struct in_addr ipaddr;
-          memcpy(&arph, line+14, 28);
-          memcpy(&ipaddr.s_addr, arph.arp_tpa, 4);
-          
-          string routerIP = inet_ntoa(ipaddr);
-          string rIP = "10.1.0.1";
-          string rIP2 = "10.1.1.1";
-		  if(macMap.count(routerIP) > 0) {
-			  // save source ip and mac
-
-			  // send arp from router to host
-		  }
-          if(rIP.compare(routerIP) == 0 || rIP2.compare(routerIP) == 0) {
-			createArpReply(eh, arph, packet_sockets[j], line, macMap[routerIP].macaddr);
-          }
-        }
-      }
-    }
-  }
+		}
+	}
   freeifaddrs(ifaddr);
 }
 
