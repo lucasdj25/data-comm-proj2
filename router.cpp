@@ -310,7 +310,8 @@ int main(int argc, char **argv){
 					memcpy(&arph, line+14, 28);
 					memcpy(&ipaddr.s_addr, arph.arp_tpa, 4);
 				 
-					string routerIP = inet_ntoa(ipaddr);
+					string destIP = inet_ntoa(ipaddr);
+					string routerIP = getRouterIP(table, tableLen, destIP);
 					createArpReply(eh, arph, packet_sockets[j], line, macMap[routerIP].macaddr);
 				}
 			}
