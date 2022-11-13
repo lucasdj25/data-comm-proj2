@@ -97,8 +97,18 @@ int main(int argc, char **argv){
 		exit(1);
 	}
 	
+	// can now just use the table number in the argv (ex: ./router 1)
+	std:string filename;
+	int table_int = stoi(argv[1]);
+	switch(table_int){
+		case 1: filename = "r1-table.txt";
+		case 2: filename = "r2-table.txt";
+		
+	}	
+	cout << "Router table file chosen: " << filename << endl;
+	
 
-	ifstream inputFile(argv[1]);
+	ifstream inputFile(filename);
 
 	string text;
 	if(inputFile.is_open()) {
@@ -263,6 +273,7 @@ int main(int argc, char **argv){
 						if(recv == -1){
 							if(errno == EWOULDBLOCK){
 							// send icmp destination unreachable packet
+							sendICMPUnreachable(iph, j, "net");
 							cout << "No ARP response received" << endl;
 							}
 						}
@@ -307,4 +318,3 @@ int main(int argc, char **argv){
 	}
   freeifaddrs(ifaddr);
 }
-

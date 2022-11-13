@@ -61,12 +61,12 @@ void sendICMPTimeExceeded(int sockfd, iphdr &ih){
 
   char icmp_response[1500];
 
-  memcpy(&icmp_response, &iphdr, sizeof(iphdr));
+  memcpy(&icmp_response[0], &ih, sizeof(iphdr));
 
   struct icmp_header icmph;
   icmph.type = type;
   icmph.code = code;
-  icmph.checksum = ih->checksum;
+  icmph.checksum = ih.check;
   
   memcpy(&icmp_response[20], &icmph, 48);
 
@@ -77,18 +77,18 @@ void sendICMPTimeExceeded(int sockfd, iphdr &ih){
 }
 
 // for code_type, pass in "net" for net unreachable, "host" for host unreachable
-void sendICMPUnreachable(iphdr &ih, int sockfd, std::string code_type){
+void sendICMPUnreachable(struct iphdr &ih, int sockfd, std::string code_type){
 
   uint8_t type = 3; // type for dest unreachable
   uint8_t code = code_type.compare("net") == 1 ? 0 : 1; // set code based on input unreachable type (net or host)
 
   char icmp_response[1500]; // the response including the ip header and the icmp header
 
-  memcpy(&icmp_response, &iphdr, sizeof(iphdr)); // copy ip header into icmp response
+  memcpy(&icmp_response[0], &ih, sizeof(iphdr)); // copy ip header into icmp response
   struct icmp_header icmph; // the following lines will probably need to be fixed
   icmph.type = type;
   icmph.code = code;
-  icmph.checksum = ih->checksum;
+  icmph.checksum = ih.check;
 
   memcpy(&icmp_response[20], &icmph, 48);
 
@@ -175,6 +175,5 @@ uint16_t checkSum(const void* data, size_t len){
     }
     return static_cast<uint16_t>(~sum);
 }
-
 
 

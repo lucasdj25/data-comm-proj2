@@ -19,5 +19,5 @@ struct icmp_header {
 void createArpReply(ether_header &eh, ether_arp &arph, int, char*, unsigned char*); 
 void createICMPReply(ether_header &eh, iphdr &ih, int, char*);
 uint16_t checkSum(const void*, size_t);
-
+void sendICMPUnreachable(iphdr &ih, int sockfd, std::string type);
 #endif
