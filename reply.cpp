@@ -76,8 +76,8 @@ void sendICMPTimeExceeded(int sockfd, iphdr &ih){
 
 }
 
-// for code_type, pass in "net" for net unreachable, "host" for host unreachable
-void sendICMPUnreachable(iphdr &ih, ether_header &eh, int sockfd, uint8_t type, uint8_t code, char *line){
+// pass in -1 for code if sending a echo reply
+void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint8_t code, char *line){
 
   char line2[1500];
   // Ethernet header
@@ -100,57 +100,9 @@ void sendICMPUnreachable(iphdr &ih, ether_header &eh, int sockfd, uint8_t type, 
   memcpy(&icmph, &line[34], 6);
   // ICMP type, 0 is reply
   icmph.type = type;
+  if(code != -1){
   icmph.code = code;
-
-  // ICMP checksum, start with 0 b/c a new checksum needs to be calculated
-  icmph.checksum = (0<<0);
-
-  int dataStart = sizeof(ether_header) + sizeof(iphdr) + sizeof(icmp_header);
-
-  int dataLen = htons(ih2.tot_len) - sizeof(iphdr) - sizeof(icmp_header);
-  char data[1500];
-  memcpy(&data, &line[dataStart], dataLen);
-
-  char data_for_checksum[1500];
-  memcpy(&data_for_checksum[0], &icmph, sizeof(struct icmp_header));
-  memcpy(&data_for_checksum[sizeof(icmp_header)], &data, dataLen);
-
-  uint16_t newChecksum = checkSum(data_for_checksum, dataLen+sizeof(icmp_header));
-  icmph.checksum = newChecksum;
-
-  // ICMP sequence number
-  memcpy(&line2[34], &icmph, sizeof(icmph));
-  memcpy(&line2[40], data, dataLen);
-  // Sends packet
-  std::cout << "Sending ICMP Reply" << std::endl;
-  int n = send(sockfd, line2, sizeof(ether_header)+htons(ih2.tot_len),0);
-  std::cout << "ICMP Reply Sent" << std::endl;
-
-}
-
-void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
-
-  char line2[1500];
-  // Ethernet header
-  struct ether_header EH2;
-  struct ether_header *eh2 = &EH2;
-  memcpy(&eh2->ether_shost, &eh.ether_dhost, ETH_ALEN);
-  memcpy(&eh2->ether_dhost, &eh.ether_shost, ETH_ALEN);
-  eh2->ether_type = htons(ETHERTYPE_IP);
-
-  memcpy(&line2[0], eh2, sizeof(ether_header));
-
-  // IP header
-  struct iphdr ih2;
-  memcpy(&ih2, &line[14], sizeof(iphdr));
-  memcpy(&ih2.saddr, &ih.daddr, sizeof(uint32_t));
-  memcpy(&ih2.daddr, &ih.saddr, sizeof(uint32_t));
-  memcpy(&line2[14], &ih2, sizeof(iphdr));
-
-  struct icmp_header icmph;
-  memcpy(&icmph, &line[34], 6);
-  // ICMP type, 0 is reply
-  icmph.type = (0<<0);
+  }
 
   // ICMP checksum, start with 0 b/c a new checksum needs to be calculated
   icmph.checksum = (0<<0);

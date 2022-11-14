@@ -274,7 +274,7 @@ int main(int argc, char **argv){
 							if(recv == -1){
 								if(errno == EWOULDBLOCK){
 								// send icmp destination unreachable packet
-								sendICMPUnreachable(iph, eh, packet_sockets[j], 3, 0, line);
+								createICMPReply(eh, iph, packet_sockets[j], 3, 1, line);
 								cout << "No ARP response received" << endl;
 								}
 							}
@@ -298,12 +298,12 @@ int main(int argc, char **argv){
 						}else{
 							cout << "No table entry found, sending ICMP Network unreachable packet" << endl;
 							
-							sendICMPUnreachable(iph, eh, packet_sockets[j], 3, 1, line);
+							createICMPReply(eh, iph, packet_sockets[j], 3, 1, line);
 						}
 							
 					 }else{
 						// if packet is for our router
-						createICMPReply(eh, iph, packet_sockets[j], line);
+						createICMPReply(eh, iph, packet_sockets[j], 0, -1, line);
 					}
 					
 				}
