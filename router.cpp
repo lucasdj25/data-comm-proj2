@@ -240,30 +240,32 @@ int main(int argc, char **argv){
 					cout << "Received an ICMP packet" << endl;
 					 
 					struct iphdr iph;
-					struct in_addr ipaddr;
+					struct in_addr ipaddr, ipaddr2;
 					memcpy(&iph, line+14, 20);
 
 					ipaddr.s_addr = iph.daddr;
+					ipaddr2.s_addr = iph.saddr;
 					string destIP = inet_ntoa(ipaddr);
+					string srcIP = inet_ntoa(ipaddr2);
 
 					 // if packet is NOT for the router
 					if(macMap.count(destIP) == 0) {
 						cout << "ICMP Packet not for router" << endl;
-						// ARP to next hop IP address
-							cout << destIP << endl;
 							
 							iph.ttl--;
+							memcpy(&line[14], &iph, sizeof(iphdr));
 							if(iph.ttl < 1){
-								createICMPReply(eh, iph, packet_sockets[j], 11, 0, line);
+								string rIP = getRouterIP(table, tableLen, srcIP);
+								createICMPUnreachable(eh, iph, packet_sockets[j], 11, 0, line, rIP);
 							}
 							
-							memcpy(&line[14], &iph, sizeof(iphdr)); // ASK ABOUT THIS!!
 							
 							string routerIP = getRouterIP(table, tableLen, destIP);
 							if(routerIP.compare("DNE") == 0){
 								cout << "No table entry found, sending ICMP Network unreachable packet" << endl;
-
-								createICMPReply(eh, iph, packet_sockets[j], 3, 1, line);
+								
+								string rIP = getRouterIP(table, tableLen, srcIP);
+								createICMPUnreachable(eh, iph, packet_sockets[j], 3, 1, line, rIP);
 								continue;
 							}
 							if(routerIP.compare("10.0.0.2") == 0){
@@ -333,3 +335,5 @@ int main(int argc, char **argv){
 	}
   freeifaddrs(ifaddr);
 }
+
+

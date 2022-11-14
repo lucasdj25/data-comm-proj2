@@ -76,14 +76,61 @@ void sendICMPTimeExceeded(int sockfd, iphdr &ih){
 
 }
 
+void createICMPUnreachable(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint8_t code, char *line, std::string rIP){
+	char line2[1500];
+  // Ethernet header
+  struct ether_header EH2;
+  struct ether_header *eh2 = &EH2;
+  memcpy(&eh2->ether_shost, &eh.ether_dhost, ETH_ALEN);
+  memcpy(&eh2->ether_dhost, &eh.ether_shost, ETH_ALEN);
+  eh2->ether_type = htons(ETHERTYPE_IP);
+
+  memcpy(&line2, eh2, sizeof(ether_header));
+
+	struct icmp_header icmp;
+	icmp.type = type;
+	icmp.code = code;
+	icmp.checksum = 0;
+	icmp.identifier = 0;
+	icmp.seq = 0;
+	
+	struct iphdr ih2;
+	memcpy(&ih2, &ih, sizeof(iphdr));
+	in_addr_t routerIp = inet_addr(rIP.c_str());
+	memcpy(&ih2.saddr, &routerIp, sizeof(uint32_t));
+	memcpy(&ih2.daddr, &ih.saddr, sizeof(uint32_t));
+	ih2.tot_len = htons(56);
+	ih2.check = 0;
+	ih2.check = checkSum(&ih2, sizeof(iphdr));	
+	
+	  int dataStart = sizeof(ether_header); 
+
+	  // length of data is in ip header
+	  // the length includes the ip header, icmp header, and the data
+	  // so subtract the lengths of headers to get the size of the data
+	  int dataLen = 28; 
+	  char data[1500];
+	  memcpy(&data, &line[dataStart], dataLen);
+	memcpy(&data[dataLen], &icmp, sizeof(icmp_header));
+	icmp.checksum = checkSum(&data, dataLen+sizeof(icmp_header));
+	// put icmp and ip headers into packet
+	memcpy(&line2[sizeof(ether_header)], &ih2, sizeof(iphdr));
+	memcpy(&line2[sizeof(ether_header)+sizeof(iphdr)], &icmp, sizeof(icmp_header));
+	// put data into packet
+	memcpy(&line2[sizeof(ether_header)+sizeof(icmp_header)+sizeof(iphdr)], &data, dataLen);	
+
+	send(sockfd, line2, sizeof(ether_header)+sizeof(icmp_header)+sizeof(iphdr)+dataLen,0);	
+}
+
 // pass in -1 for code if sending a echo reply
 void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint8_t code, char *line){
 
   // Drop packet if wrong checksum
   uint16_t recvChecksum = checkSum(&ih, sizeof(iphdr));
+  std::cout << "Checksum recv = " << recvChecksum << std::endl;
   if(recvChecksum != 0) {
 	  std::cout << "Checksum is incorrect, packet is being dropped" << std::endl;
-	  return;
+//	  return;
   }
 
   char line2[1500];
@@ -111,7 +158,7 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint
   memcpy(&line2[14], &ih2, sizeof(iphdr));
 
   struct icmp_header icmph;
-  memcpy(&icmph, &line[34], 6);
+  memcpy(&icmph, &line[34], 6); 
   // ICMP type, 0 is reply
   icmph.type = type;
   if(code != -1){
@@ -119,7 +166,7 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint
   }
 
   // ICMP checksum, start with 0 b/c a new checksum needs to be calculated
-  icmph.checksum = (0<<0);
+  icmph.checksum = 0;
 
   int dataStart = sizeof(ether_header) + sizeof(iphdr) + sizeof(icmp_header);
 
