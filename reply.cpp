@@ -104,14 +104,6 @@ void createICMPError(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint
 // pass in -1 for code if sending a echo reply
 void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint8_t code, char *line){
 
-  // Drop packet if wrong checksum
-  uint16_t recvChecksum = checkSum(&ih, sizeof(iphdr));
-  std::cout << "Checksum recv = " << recvChecksum << std::endl;
-  if(recvChecksum != 0) {
-	  std::cout << "Checksum is incorrect, packet is being dropped" << std::endl;
-//	  return;
-  }
-
   char line2[1500];
   // Ethernet header
   struct ether_header EH2;

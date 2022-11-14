@@ -248,6 +248,11 @@ int main(int argc, char **argv){
 					string destIP = inet_ntoa(ipaddr);
 					string srcIP = inet_ntoa(ipaddr2);
 
+					if(checkSum(&iph, sizeof(iphdr) != 0 ) {
+						cout << "Checksum is incorrect, packet is being dropped" << endl;
+						continue;
+					}
+
 					 // if packet is NOT for the router
 					if(macMap.count(destIP) == 0) {
 						cout << "ICMP Packet not for router" << endl;
