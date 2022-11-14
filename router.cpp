@@ -255,10 +255,13 @@ int main(int argc, char **argv){
 							iph.ttl--;
 							iph.check = 0;
 							iph.check = checkSum(&iph, sizeof(iphdr));
-							memcpy(&line[14], &iph, sizeof(iphdr)); // ASK ABOUT THIS!!
+							// put new ip header into packet
+							memcpy(&line[14], &iph, sizeof(iphdr)); 
+
+
 							if(iph.ttl < 1){
 								string rIP = getRouterIP(table, tableLen, srcIP);
-								createICMPUnreachable(eh, iph, packet_sockets[j], 11, 0, line, rIP);
+								createICMPError(eh, iph, packet_sockets[j], 11, 0, line, rIP);
 							}
 							
 							
@@ -267,7 +270,7 @@ int main(int argc, char **argv){
 								cout << "No table entry found, sending ICMP Network unreachable packet" << endl;
 								
 								string rIP = getRouterIP(table, tableLen, srcIP);
-								createICMPUnreachable(eh, iph, packet_sockets[j], 3, 1, line, rIP);
+								createICMPError(eh, iph, packet_sockets[j], 3, 1, line, rIP);
 								continue;
 							}
 							if(routerIP.compare("10.0.0.2") == 0){

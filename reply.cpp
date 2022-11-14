@@ -55,28 +55,7 @@ void createArpReply(ether_header &eh, ether_arp &arph, int sockfd, char *line, u
   }
 }
 
-void sendICMPTimeExceeded(int sockfd, iphdr &ih){
-  uint8_t type = 11; // indicates time exceeded message
-  uint8_t code = 0;  // 0 is the time exceeded type
-
-  char icmp_response[1500];
-
-  memcpy(&icmp_response[0], &ih, sizeof(iphdr));
-
-  struct icmp_header icmph;
-  icmph.type = type;
-  icmph.code = code;
-  icmph.checksum = ih.check;
-  
-  memcpy(&icmp_response[20], &icmph, 48);
-
-  size_t send_size = sizeof(icmp_header) + sizeof(iphdr);
-  int n = send(sockfd, icmp_response, send_size, 0);
-
-
-}
-
-void createICMPUnreachable(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint8_t code, char *line, std::string rIP){
+void createICMPError(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint8_t code, char *line, std::string rIP){
 	char line2[1500];
   // Ethernet header
   struct ether_header EH2;
@@ -153,16 +132,16 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint
   ih2.check = 0;
   // Recalculate checksum b/c ttl changed
   ih2.check = checkSum(&ih2, sizeof(iphdr));
-
-  
+  // put ip header into packet
   memcpy(&line2[14], &ih2, sizeof(iphdr));
 
   struct icmp_header icmph;
   memcpy(&icmph, &line[34], sizeof(icmp_header)); 
+
   // ICMP type, 0 is reply
   icmph.type = type;
   if(code != -1){
-  icmph.code = code;
+	  icmph.code = code;
   }
 
   // ICMP checksum, start with 0 b/c a new checksum needs to be calculated
@@ -185,16 +164,15 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint
   // put data into array
   memcpy(&data_for_checksum[sizeof(icmp_header)], &data, dataLen);
 
-  // checksum is calculate using the bytes from the icmp header AND data
-  uint16_t newChecksum = checkSum(data_for_checksum, dataLen+sizeof(icmp_header));
+  // checksum is calculated using the bytes from the icmp header AND data
+  icmph.checksum = checkSum(data_for_checksum, dataLen+sizeof(icmp_header));
 
-  // copy the new checksum into the icmp header
-  icmph.checksum = newChecksum;
-
-  // ICMP sequence number
+  // put ICMP into packet 
   memcpy(&line2[34], &icmph, sizeof(icmph));
-std::cout << "size of icmp header = " << sizeof(icmp_header) << std::endl;
+  // put data into packet
   memcpy(&line2[42], data, dataLen);
+
+
   // Sends packet
   std::cout << "Sending ICMP Reply" << std::endl;
   int n = send(sockfd, line2, sizeof(ether_header)+htons(ih2.tot_len),0);
