@@ -77,11 +77,11 @@ void sendICMPTimeExceeded(int sockfd, iphdr &ih){
 }
 
 // for code_type, pass in "net" for net unreachable, "host" for host unreachable
-void sendICMPUnreachable(struct iphdr &ih, int sockfd, std::string code_type, char* line){
+void sendICMPUnreachable(iphdr &ih, ether_header &eh, int sockfd, std::string code_type, char* line){
 
   uint8_t type = 3; // type for dest unreachable
   uint8_t code = code_type.compare("net") == 0 ? 0 : 1; // set code based on input unreachable type (net or host)
-
+  uint8_t ttl = 64;
   char icmp_response[1500]; // the response including the ip header and the icmp header
   
   // create new ip header
@@ -89,18 +89,25 @@ void sendICMPUnreachable(struct iphdr &ih, int sockfd, std::string code_type, ch
   memcpy(&newIPhdr, &ih, sizeof(iphdr));
   memcpy(&newIPhdr.saddr, &ih.daddr, sizeof(uint32_t));
   memcpy(&newIPhdr.daddr, &ih.saddr, sizeof(uint32_t));
-
-  // copy ip header into icmp response
-  memcpy(&icmp_response, &newIPhdr, sizeof(iphdr));
+  memcpy(&newIPhdr.ttl, &ttl, sizeof(uint8_t));
   
+  // create new ether header
+  struct ether_header EH2;
+  struct ether_header *eh2 = &EH2;
+  memcpy(&eh2->ether_shost, &eh.ether_dhost, ETH_ALEN);
+  memcpy(&eh2->ether_dhost, &eh.ether_shost, ETH_ALEN);
+  eh2->ether_type = htons(ETHERTYPE_IP);
   
+  memcpy(&icmp_response[0], eh2, sizeof(ether_header));
+  memcpy(&icmp_response[14], &newIPhdr, sizeof(iphdr));
+ 
   // create new ICMP header 
   struct icmp_header icmph; // the following lines will probably need to be fixed
   icmph.type = type;
   icmph.code = code;
   icmph.checksum = ih.check;
 
-  memcpy(&icmp_response[20], &icmph, 48);
+  memcpy(&icmp_response[34], &icmph, sizeof(icmph));
 
   size_t send_size = sizeof(icmp_header) + sizeof(iphdr);
   int n = send(sockfd, icmp_response, send_size, 0);
