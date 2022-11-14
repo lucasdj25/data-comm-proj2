@@ -100,11 +100,11 @@ int main(int argc, char **argv){
 	// can now just use the table number in the argv (ex: ./router 1)
 	std:string filename;
 	int table_int = stoi(argv[1]);
-	switch(table_int){
-		case 1: filename = "r1-table.txt";
-		case 2: filename = "r2-table.txt";
-		
-	}	
+	if(table_int == 1){
+		filename = "r1-table.txt";
+	}else{
+		filename = "r2-table.txt";
+	}
 	cout << "Router table file chosen: " << filename << endl;
 	
 
@@ -252,8 +252,22 @@ int main(int argc, char **argv){
 					if(macMap.count(destIP) == 0) {
 						cout << "ICMP Packet not for router" << endl;
 						// ARP to next hop IP address
-						string routerIP = getRouterIP(table, tableLen, destIP);
-						if(routerIP.compare("DNE") != 0){
+							cout << destIP << endl;
+							
+							iph.ttl--;
+							if(iph.ttl < 1){
+								createICMPReply(eh, iph, packet_sockets[j], 11, 0, line);
+							}
+							
+							memcpy(&line[14], &iph, sizeof(iphdr)); // ASK ABOUT THIS!!
+							
+							string routerIP = getRouterIP(table, tableLen, destIP);
+							if(routerIP.compare("DNE") == 0){
+								cout << "No table entry found, sending ICMP Network unreachable packet" << endl;
+
+								createICMPReply(eh, iph, packet_sockets[j], 3, 1, line);
+								continue;
+							}
 							if(routerIP.compare("10.0.0.2") == 0){
 								routerIP = "10.0.0.1";
 							}else if(routerIP.compare("10.0.0.1") == 0){
@@ -274,7 +288,7 @@ int main(int argc, char **argv){
 							if(recv == -1){
 								if(errno == EWOULDBLOCK){
 								// send icmp destination unreachable packet
-								createICMPReply(eh, iph, packet_sockets[j], 3, 1, line);
+								createICMPReply(eh, iph, packet_sockets[j], 3, 0, line);
 								cout << "No ARP response received" << endl;
 								}
 							}
@@ -295,11 +309,7 @@ int main(int argc, char **argv){
 								// forward packet on same socket
 								cout << "Forwarding packet" << endl;
 								send(macMap[routerIP].sock, line, n, 0);
-						}else{
-							cout << "No table entry found, sending ICMP Network unreachable packet" << endl;
-							
-							createICMPReply(eh, iph, packet_sockets[j], 3, 1, line);
-						}
+	
 							
 					 }else{
 						// if packet is for our router
