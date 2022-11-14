@@ -77,14 +77,24 @@ void sendICMPTimeExceeded(int sockfd, iphdr &ih){
 }
 
 // for code_type, pass in "net" for net unreachable, "host" for host unreachable
-void sendICMPUnreachable(struct iphdr &ih, int sockfd, std::string code_type){
+void sendICMPUnreachable(struct iphdr &ih, int sockfd, std::string code_type, char* line){
 
   uint8_t type = 3; // type for dest unreachable
-  uint8_t code = code_type.compare("net") == 1 ? 0 : 1; // set code based on input unreachable type (net or host)
+  uint8_t code = code_type.compare("net") == 0 ? 0 : 1; // set code based on input unreachable type (net or host)
 
   char icmp_response[1500]; // the response including the ip header and the icmp header
+  
+  // create new ip header
+  struct iphdr newIPhdr;
+  memcpy(&newIPhdr, &ih, sizeof(iphdr));
+  memcpy(&newIPhdr.saddr, &ih.daddr, sizeof(uint32_t));
+  memcpy(&newIPhdr.daddr, &ih.saddr, sizeof(uint32_t));
 
-  memcpy(&icmp_response[0], &ih, sizeof(iphdr)); // copy ip header into icmp response
+  // copy ip header into icmp response
+  memcpy(&icmp_response, &newIPhdr, sizeof(iphdr));
+  
+  
+  // create new ICMP header 
   struct icmp_header icmph; // the following lines will probably need to be fixed
   icmph.type = type;
   icmph.code = code;
@@ -94,16 +104,11 @@ void sendICMPUnreachable(struct iphdr &ih, int sockfd, std::string code_type){
 
   size_t send_size = sizeof(icmp_header) + sizeof(iphdr);
   int n = send(sockfd, icmp_response, send_size, 0);
+  std::cout << "Size of invalid ICMP packet: " << n << std::endl;
 
 }
 
 void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
-  // Drop packet if wrong checksum
-  uint16_t recvChecksum = checkSum(&ih, sizeof(iphdr));
-  if(recvChecksum != 0) {
-	  std::cout << "Checksum is incorrect, packet is being dropped" << std::endl;
-	  return;
-  }
 
   char line2[1500];
   // Ethernet header
@@ -120,16 +125,6 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   memcpy(&ih2, &line[14], sizeof(iphdr));
   memcpy(&ih2.saddr, &ih.daddr, sizeof(uint32_t));
   memcpy(&ih2.daddr, &ih.saddr, sizeof(uint32_t));
-  ih2.ttl--;
-  ih2.check = 0;
-  // Recalculate checksum b/c ttl changed
-  ih2.check = checkSum(&ih2, sizeof(iphdr));
-
-  // time to live reaches zero 
-  if(ih2.ttl < 1) {
-	  sendICMPTimeExceeded(sockfd, ih2); 
-  }
-
   memcpy(&line2[14], &ih2, sizeof(iphdr));
 
   struct icmp_header icmph;
