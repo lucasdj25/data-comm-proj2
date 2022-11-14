@@ -59,10 +59,10 @@ void createArpRequest(const int sockfd, ether_header &eh, iphdr &iph, string rou
       // Target Mac address
       memcpy(&arph2->arp_tha, ether_aton("00:00:00:00:00:00"), 6); 
        
-	  struct in_addr src, dest;
-	  // src ip is the router's ip of the interface that the dest ip is on
-	  src.s_addr = inet_addr(routerIP.c_str()); 
-	  dest.s_addr = iph.daddr;
+      struct in_addr src, dest;
+      // src ip is the router's ip of the interface that the dest ip is on
+      src.s_addr = inet_addr(routerIP.c_str()); 
+      dest.s_addr = iph.daddr;
 
       // Source IP address
       memcpy(&arph2->arp_spa, &src, sizeof(uint32_t)); 
@@ -167,34 +167,34 @@ int main(int argc, char **argv){
 					return 2;
 				}
 
-			    // Mac map uses ip as the key and the value
-                // is the mac, interface name, and socket number
-                struct interface face;
-                memcpy(&face.macaddr, s->sll_addr, 8);
-                face.name = iName;
-                face.sock = packet_sockets[i];
+				// Mac map uses ip as the key and the value
+				// is the mac, interface name, and socket number
+				struct interface face;
+				memcpy(&face.macaddr, s->sll_addr, 8);
+				face.name = iName;
+				face.sock = packet_sockets[i];
 
-                if(iName.compare("r1-eth0") == 0) {
-                    macMap.insert(make_pair("10.0.0.1", face));
-                }
-                else if(iName.compare("r1-eth1") == 0) {
-                    macMap.insert(make_pair("10.1.0.1", face));
-                }
-                else if(iName.compare("r1-eth2") == 0) {
-                    macMap.insert(make_pair("10.1.1.1", face));
-                }
-                else if(iName.compare("r2-eth0") == 0) {
-                    macMap.insert(make_pair("10.0.0.2", face));
-                }
-                else if(iName.compare("r2-eth1") == 0) {
-                    macMap.insert(make_pair("10.3.0.1", face));
-                }
-                else if(iName.compare("r2-eth2") == 0) {
-                    macMap.insert(make_pair("10.3.1.1", face));
-                }
-                else if(iName.compare("r2-eth3") == 0) {
-                    macMap.insert(make_pair("10.3.4.1", face));
-                }
+				if(iName.compare("r1-eth0") == 0) {
+				    macMap.insert(make_pair("10.0.0.1", face));
+				}
+				else if(iName.compare("r1-eth1") == 0) {
+				    macMap.insert(make_pair("10.1.0.1", face));
+				}
+				else if(iName.compare("r1-eth2") == 0) {
+				    macMap.insert(make_pair("10.1.1.1", face));
+				}
+				else if(iName.compare("r2-eth0") == 0) {
+				    macMap.insert(make_pair("10.0.0.2", face));
+				}
+				else if(iName.compare("r2-eth1") == 0) {
+				    macMap.insert(make_pair("10.3.0.1", face));
+				}
+				else if(iName.compare("r2-eth2") == 0) {
+				    macMap.insert(make_pair("10.3.1.1", face));
+				}
+				else if(iName.compare("r2-eth3") == 0) {
+				    macMap.insert(make_pair("10.3.4.1", face));
+				}
 				
 				if(bind(packet_sockets[i],tmp->ifa_addr,sizeof(struct sockaddr_ll))==-1){
 					perror("bind");
@@ -214,14 +214,13 @@ int main(int argc, char **argv){
 		FD_SET(packet_sockets[j], &fds);
 	}
 
-  // Listens for packets on all sockets
+  	// Listens for packets on all sockets
 	while(1){
 		fd_set tmp = fds;
 		int nn=select(FD_SETSIZE, &tmp, NULL, NULL, NULL);
 		for(int j=0; j<i;j++){
 			if(FD_ISSET(packet_sockets[j],&tmp)){
 				cout << "Got something on the socket" << endl;
-
 				char line[5000];
 				struct sockaddr_ll recvaddr;
 				unsigned int recvaddrlen=sizeof(struct sockaddr_ll);
@@ -250,63 +249,61 @@ int main(int argc, char **argv){
 					if(macMap.count(destIP) == 0) {
 						cout << "ICMP Packet not for router" << endl;
 						// ARP to next hop IP address
-							cout << destIP << endl;
+						cout << destIP << endl;
 							
-							iph.ttl--;
-							if(iph.ttl < 1){
-								createICMPReply(eh, iph, packet_sockets[j], 11, 0, line);
-							}
+						iph.ttl--;
+						if(iph.ttl < 1){
+							createICMPReply(eh, iph, packet_sockets[j], 11, 0, line);
+						}
 							
-							memcpy(&line[14], &iph, sizeof(iphdr)); // ASK ABOUT THIS!!
-							
-							string routerIP = getRouterIP(table, tableLen, destIP);
-							if(routerIP.compare("DNE") == 0){
-								cout << "No table entry found, sending ICMP Network unreachable packet" << endl;
+						memcpy(&line[14], &iph, sizeof(iphdr)); // ASK ABOUT THIS!!
+						
+						string routerIP = getRouterIP(table, tableLen, destIP);
+						if(routerIP.compare("DNE") == 0){
+							cout << "No table entry found, sending ICMP Network unreachable packet" << endl;
+							createICMPReply(eh, iph, packet_sockets[j], 3, 1, line);
+							continue;
+						}
+						if(routerIP.compare("10.0.0.2") == 0){
+							routerIP = "10.0.0.1";
+						}else if(routerIP.compare("10.0.0.1") == 0){
+							routerIP="10.0.0.2";
+						}
+						createArpRequest(macMap[routerIP].sock, eh, iph, routerIP); 
+						cout << "Sent ARP packet to next hop, waiting for reply" << endl;
+						
+						// set timeout for ARP response
+						struct timeval timeout;
+						timeout.tv_sec=2;
+						timeout.tv_usec=0;
 
-								createICMPReply(eh, iph, packet_sockets[j], 3, 1, line);
-								continue;
-							}
-							if(routerIP.compare("10.0.0.2") == 0){
-								routerIP = "10.0.0.1";
-							}else if(routerIP.compare("10.0.0.1") == 0){
-								routerIP="10.0.0.2";
-							}
-							createArpRequest(macMap[routerIP].sock, eh, iph, routerIP); 
-							cout << "Sent ARP packet to next hop, waiting for reply" << endl;
-							
-							// set timeout for ARP response
-							struct timeval timeout;
-							timeout.tv_sec=2;
-							timeout.tv_usec=0;
-
-							setsockopt(macMap[routerIP].sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-							char arpResponse[5000];
-							int recv = recvfrom(macMap[routerIP].sock, arpResponse, 5000,0, (struct sockaddr*)&recvaddr, &recvaddrlen);
-							// if no ARP response is received
-							if(recv == -1){
-								if(errno == EWOULDBLOCK){
+						setsockopt(macMap[routerIP].sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+						char arpResponse[5000];
+						int recv = recvfrom(macMap[routerIP].sock, arpResponse, 5000,0, (struct sockaddr*)&recvaddr, &recvaddrlen);
+						// if no ARP response is received
+						if(recv == -1){
+							if(errno == EWOULDBLOCK){
 								// send icmp destination unreachable packet
 								createICMPReply(eh, iph, packet_sockets[j], 3, 0, line);
 								cout << "No ARP response received" << endl;
-								}
 							}
-							cout << "Received ARP response, building new ethernet header" << endl;
-							// if ARP Response is received
-								// construct new ethernet header
-								struct ether_header response_eh;
-								memcpy(&response_eh, arpResponse, 14);							
-	 							
-	 							struct ether_header EH2;
-								struct ether_header *eh2 = &EH2;
-								memcpy(&eh2->ether_shost, &response_eh.ether_dhost, ETH_ALEN);
-								memcpy(&eh2->ether_dhost, &response_eh.ether_shost, ETH_ALEN);
-								eh2->ether_type = htons(ETHERTYPE_IP);
+						}
+						cout << "Received ARP response, building new ethernet header" << endl;
+						// if ARP Response is received
+						// construct new ethernet header
+						struct ether_header response_eh;
+						memcpy(&response_eh, arpResponse, 14);							
+						struct ether_header EH2;
+						struct ether_header *eh2 = &EH2;
+						memcpy(&eh2->ether_shost, &response_eh.ether_dhost, ETH_ALEN);
+						memcpy(&eh2->ether_dhost, &response_eh.ether_shost, ETH_ALEN);
+						eh2->ether_type = htons(ETHERTYPE_IP);
 
-								memcpy(&line[0], eh2, sizeof(ether_header));
-	 							
-								// forward packet on same socket
-								cout << "Forwarding packet" << endl;
-								send(macMap[routerIP].sock, line, n, 0);
+						memcpy(&line[0], eh2, sizeof(ether_header));
+						
+						// forward packet on same socket
+						cout << "Forwarding packet" << endl;
+						send(macMap[routerIP].sock, line, n, 0);
 	
 							
 					 }else{
