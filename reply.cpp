@@ -98,6 +98,12 @@ void sendICMPUnreachable(struct iphdr &ih, int sockfd, std::string code_type){
 }
 
 void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
+  // Drop packet if wrong checksum
+  uint16_t recvChecksum = checkSum(&ih, sizeof(iphdr));
+  if(recvChecksum != 0) {
+	  std::cout << "Checksum is incorrect, packet is being dropped" << std::endl;
+	  return;
+  }
 
   char line2[1500];
   // Ethernet header
@@ -114,6 +120,16 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, char *line){
   memcpy(&ih2, &line[14], sizeof(iphdr));
   memcpy(&ih2.saddr, &ih.daddr, sizeof(uint32_t));
   memcpy(&ih2.daddr, &ih.saddr, sizeof(uint32_t));
+  ih2.ttl--;
+  ih2.check = 0;
+  // Recalculate checksum b/c ttl changed
+  ih2.check = checkSum(&ih2, sizeof(iphdr));
+
+  // time to live reaches zero 
+  if(ih2.ttl < 1) {
+	  sendICMPTimeExceeded(sockfd, ih2); 
+  }
+
   memcpy(&line2[14], &ih2, sizeof(iphdr));
 
   struct icmp_header icmph;
