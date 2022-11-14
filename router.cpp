@@ -137,8 +137,6 @@ int main(int argc, char **argv){
 		numWords++;
 	}
 	    
-	string s1 = "10.3.0.2";
-	cout << "Router IP for 10.3.0.2 = " << getRouterIP(table, tableLen, s1) << endl;
 
 	int packet_sockets[16];
 	struct ifaddrs *ifaddr, *tmp;
