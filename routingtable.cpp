@@ -25,12 +25,16 @@ std::string getRouterIP(struct routingTableRow table[], int tableLen, std::strin
 				if(table[i].nextHopDevice.length() > 1) {
 					routerIP = table[i].nextHopDevice;
 					std::cout << "Packet needs to hop to device: " << routerIP << std::endl;
+					break;
 				}
-				else
+				else {
 					routerIP = subRouterIP + ".1";
+					break;
+				}
 			}
 			else {
 				routerIP = "DNE";
+				break;
 			}
         }
 		else {
