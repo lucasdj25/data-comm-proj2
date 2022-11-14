@@ -158,7 +158,7 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint
   memcpy(&line2[14], &ih2, sizeof(iphdr));
 
   struct icmp_header icmph;
-  memcpy(&icmph, &line[34], 6); 
+  memcpy(&icmph, &line[34], sizeof(icmp_header)); 
   // ICMP type, 0 is reply
   icmph.type = type;
   if(code != -1){
@@ -193,7 +193,8 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint
 
   // ICMP sequence number
   memcpy(&line2[34], &icmph, sizeof(icmph));
-  memcpy(&line2[40], data, dataLen);
+std::cout << "size of icmp header = " << sizeof(icmp_header) << std::endl;
+  memcpy(&line2[42], data, dataLen);
   // Sends packet
   std::cout << "Sending ICMP Reply" << std::endl;
   int n = send(sockfd, line2, sizeof(ether_header)+htons(ih2.tot_len),0);

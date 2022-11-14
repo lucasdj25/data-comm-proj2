@@ -253,7 +253,9 @@ int main(int argc, char **argv){
 						cout << "ICMP Packet not for router" << endl;
 							
 							iph.ttl--;
-							memcpy(&line[14], &iph, sizeof(iphdr));
+							iph.check = 0;
+							iph.check = checkSum(&iph, sizeof(iphdr));
+							memcpy(&line[14], &iph, sizeof(iphdr)); // ASK ABOUT THIS!!
 							if(iph.ttl < 1){
 								string rIP = getRouterIP(table, tableLen, srcIP);
 								createICMPUnreachable(eh, iph, packet_sockets[j], 11, 0, line, rIP);
@@ -335,5 +337,4 @@ int main(int argc, char **argv){
 	}
   freeifaddrs(ifaddr);
 }
-
 
