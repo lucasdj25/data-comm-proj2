@@ -167,7 +167,7 @@ void createICMPReply(ether_header &eh, iphdr &ih, int sockfd, uint8_t type, uint
 
   // Sends packet
   std::cout << "Sending ICMP Reply" << std::endl;
-  int n = send(sockfd, line2, sizeof(ether_header)+htons(ih2.tot_len),0);
+  send(sockfd, line2, sizeof(ether_header)+htons(ih2.tot_len),0);
   std::cout << "ICMP Reply Sent" << std::endl;
 }
 

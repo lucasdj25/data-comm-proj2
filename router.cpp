@@ -73,15 +73,11 @@ void createArpRequest(const int sockfd, ether_header &eh, iphdr &iph, string rou
       memcpy(&line[14], arph2, sizeof(ether_arp));
        
       // Sends packet
-      cout << "Sending Arp Request" << endl;
-      int n = send(sockfd, line, 42 ,0);
-      if(n == 42){
-        cout << "Arp Request Sent" << endl;
-      }   
+      send(sockfd, line, 42 ,0);
 }
 
 struct interface {
-    unsigned char macaddr[8];
+    unsigned char macaddr[6];
     string name;
     int sock;
 };
@@ -161,7 +157,6 @@ int main(int argc, char **argv){
 				cout << "Creating Socket on interface " << tmp->ifa_name << endl;
 
 				packet_sockets[i] = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-				cout << "socket: " << packet_sockets[i] << endl;
 				if(packet_sockets[i]<0){
 					perror("socket");
 					return 2;
@@ -220,6 +215,7 @@ int main(int argc, char **argv){
 		int nn=select(FD_SETSIZE, &tmp, NULL, NULL, NULL);
 		for(int j=0; j<i;j++){
 			if(FD_ISSET(packet_sockets[j],&tmp)){
+				cout << "----------------------------------" << endl;
 				cout << "Got something on the socket" << endl;
 
 				char line[5000];
@@ -237,8 +233,6 @@ int main(int argc, char **argv){
 
 				// ip type is 0x0800
 				if(ntohs(eh.ether_type) == ETHERTYPE_IP) {
-					cout << "Received an ICMP packet" << endl;
-					 
 					struct iphdr iph;
 					struct in_addr ipaddr, ipaddr2;
 					memcpy(&iph, line+14, 20);
@@ -248,43 +242,46 @@ int main(int argc, char **argv){
 					string destIP = inet_ntoa(ipaddr);
 					string srcIP = inet_ntoa(ipaddr2);
 
+					cout << "Received an ICMP packet for: " << destIP << endl;
 					if(checkSum(&iph, sizeof(iphdr) != 0 ) {
 						cout << "Checksum is incorrect, packet is being dropped" << endl;
 						continue;
 					}
 
+					string routerIP = getRouterIP(table, tableLen, destIP);
 					 // if packet is NOT for the router
 					if(macMap.count(destIP) == 0) {
-						cout << "ICMP Packet not for router" << endl;
-							
+							stringstream ss;
+							for(unsigned char c : macMap[routerIP].macaddr)
+								ss << setw(2) << setprecision(2) << setfill('0') << hex << (unsigned)c << ":";
+							string strMac = ss.str();
+							cout << "Hop to: " << routerIP << "\tMac address is: " << strMac << endl;
+
 							iph.ttl--;
 							iph.check = 0;
 							iph.check = checkSum(&iph, sizeof(iphdr));
 							// put new ip header into packet
 							memcpy(&line[14], &iph, sizeof(iphdr)); 
 
-
+							// time exceeded
 							if(iph.ttl < 1){
 								string rIP = getRouterIP(table, tableLen, srcIP);
+								cout << "TTL reached 0, sending ICMP time exceeded packet" << endl;
 								createICMPError(eh, iph, packet_sockets[j], 11, 0, line, rIP);
+								continue;
 							}
 							
 							
-							string routerIP = getRouterIP(table, tableLen, destIP);
+							string rIP = getRouterIP(table, tableLen, srcIP);
 							if(routerIP.compare("DNE") == 0){
 								cout << "No table entry found, sending ICMP Network unreachable packet" << endl;
 								
-								string rIP = getRouterIP(table, tableLen, srcIP);
 								createICMPError(eh, iph, packet_sockets[j], 3, 1, line, rIP);
 								continue;
 							}
-							if(routerIP.compare("10.0.0.2") == 0){
-								routerIP = "10.0.0.1";
-							}else if(routerIP.compare("10.0.0.1") == 0){
-								routerIP="10.0.0.2";
-							}
+
 							createArpRequest(macMap[routerIP].sock, eh, iph, routerIP); 
-							cout << "Sent ARP packet to next hop, waiting for reply" << endl;
+							cout << "Sent ARP packet to " << routerIP << ", waiting for reply" << endl;
 							
 							// set timeout for ARP response
 							struct timeval timeout;
@@ -297,9 +294,10 @@ int main(int argc, char **argv){
 							// if no ARP response is received
 							if(recv == -1){
 								if(errno == EWOULDBLOCK){
-								// send icmp destination unreachable packet
-								createICMPReply(eh, iph, packet_sockets[j], 3, 0, line);
-								cout << "No ARP response received" << endl;
+									// send icmp destination unreachable packet
+									createICMPError(eh, iph, packet_sockets[j], 3, 0, line, rIP);
+									cout << "No ARP response received" << endl;
+									continue;
 								}
 							}
 							cout << "Received ARP response, building new ethernet header" << endl;

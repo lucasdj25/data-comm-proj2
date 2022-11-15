@@ -23,6 +23,10 @@ std::string getRouterIP(struct routingTableRow table[], int tableLen, std::strin
 			if(table[i].nextHopDevice.length() > 1) {
 				routerIP = table[i].nextHopDevice;
 				std::cout << "Packet needs to hop to device: " << routerIP << std::endl;
+				if(routerIP.compare("10.0.0.1") == 0)
+					routerIP = "10.0.0.2";
+				else if(routerIP.compare("10.0.0.2") == 0)
+					routerIP = "10.0.0.1";
 				break;
 			}
 			else {
