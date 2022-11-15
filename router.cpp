@@ -243,7 +243,7 @@ int main(int argc, char **argv){
 					string srcIP = inet_ntoa(ipaddr2);
 
 					cout << "Received an ICMP packet for: " << destIP << endl;
-					if(checkSum(&iph, sizeof(iphdr) != 0 ) {
+					if(checkSum(&iph, sizeof(iphdr)) != 0) {
 						cout << "Checksum is incorrect, packet is being dropped" << endl;
 						continue;
 					}
