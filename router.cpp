@@ -276,7 +276,7 @@ int main(int argc, char **argv){
 							if(routerIP.compare("DNE") == 0){
 								cout << "No table entry found, sending ICMP Network unreachable packet" << endl;
 								
-								createICMPError(eh, iph, packet_sockets[j], 3, 1, line, rIP);
+								createICMPError(eh, iph, packet_sockets[j], 3, 0, line, rIP);
 								continue;
 							}
 
@@ -295,7 +295,7 @@ int main(int argc, char **argv){
 							if(recv == -1){
 								if(errno == EWOULDBLOCK){
 									// send icmp destination unreachable packet
-									createICMPError(eh, iph, packet_sockets[j], 3, 0, line, rIP);
+									createICMPError(eh, iph, packet_sockets[j], 3, 1, line, rIP);
 									cout << "No ARP response received" << endl;
 									continue;
 								}
